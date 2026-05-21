@@ -9,6 +9,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, doc, getDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyB2ft9H5rdZvMKU8P62COYjyNlp_Tglfts",
@@ -21,6 +22,7 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const auth = getAuth(app);
 
   // Stay ENTIRELY within the original known-working collection:
   //   scorecard/finance_manager_2026/interviewers/{docId}
@@ -113,7 +115,14 @@
     }
   };
 
-  window.dispatchEvent(new Event('firestore-ready'));
+  // Sign in anonymously so Firestore rules (which require auth) are satisfied
+  signInAnonymously(auth)
+    .then(() => window.dispatchEvent(new Event('firestore-ready')))
+    .catch(err => {
+      console.error('[Auth] anonymous sign-in failed:', err);
+      // Fall back — try anyway in case rules allow unauthenticated reads
+      window.dispatchEvent(new Event('firestore-ready'));
+    });
 </script>
 
 <style>
