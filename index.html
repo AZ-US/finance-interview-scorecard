@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finance Manager 面试评分表 — Amgreat North America</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB2ft9H5rdZvMKU8P62COYjyNlp_Tglfts",
+    authDomain: "commission-calculator-dd155.firebaseapp.com",
+    projectId: "commission-calculator-dd155",
+    storageBucket: "commission-calculator-dd155.firebasestorage.app",
+    messagingSenderId: "827374308396",
+    appId: "1:827374308396:web:cea7a32bdf54125fe35589"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const colRef = collection(db, "scorecard", "finance_manager_2026", "interviewers");
+  let saveTimer = null;
+
+  function setSyncEl(s) {
+    const el = document.getElementById('sync-status');
+    if (!el) return;
+    if (s === 'saving') { el.textContent = '同步中…'; el.className = 'sync-status saving'; }
+    else if (s === 'saved') { el.textContent = '已同步 ✓'; el.className = 'sync-status saved'; }
+    else { el.textContent = '同步失败'; el.className = 'sync-status error'; }
+  }
+
+  window.__sc = {
+    hasPendingSave: false,
+    subscribe(cb) {
+      return onSnapshot(colRef, snap => {
+        const data = {};
+        snap.forEach(d => { data[d.id] = d.data(); });
+        cb(data);
+      }, err => console.error('[Firestore]', err));
+    },
+    scheduleSave(id, payload) {
+      this.hasPendingSave = true;
+      clearTimeout(saveTimer);
+      setSyncEl('saving');
+      saveTimer = setTimeout(async () => {
+        try {
+          await setDoc(doc(colRef, id), payload);
+          setSyncEl('saved');
+          this.hasPendingSave = false;
+        } catch(e) {
+          console.error('[Firestore] save error:', e);
+          setSyncEl('error');
+          this.hasPendingSave = false;
+        }
+      }, 600);
+    }
+  };
+
+  window.dispatchEvent(new Event('firestore-ready'));
+</script>
+
+<style>
+:root {
+  --ink: #111318; --ink-mid: #3d4350; --ink-soft: #6b7384; --ink-mute: #9aa1b0;
+  --line: #e0e3ea; --line-soft: #f0f2f6; --bg: #f7f8fb; --white: #ffffff;
+  --red: #c0392b; --red-dim: #fdf1f0; --red-line: #f4c0bb;
+  --amber: #b7770d; --amber-dim: #fdf6e7; --amber-line: #f0d896;
+  --green: #1a7a48; --green-dim: #ebfaf3; --green-line: #a3dcbc;
+  --accent: #1a3a5c; --accent-soft: #e8f0f8; --accent-mid: #2d5a8e;
+  --radius: 12px; --radius-sm: 7px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; font-size: 14px; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+
+/* Name overlay */
+.name-overlay { position: fixed; inset: 0; background: rgba(15,20,35,.7); display: flex; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(4px); }
+.name-box { background: var(--white); border-radius: var(--radius); padding: 2.5rem 2rem 2rem; width: 360px; max-width: 90vw; text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.25); }
+.name-icon { font-size: 36px; margin-bottom: 1rem; }
+.name-box h2 { font-family: 'Instrument Serif',Georgia,serif; font-size: 20px; color: var(--ink); margin-bottom: 6px; }
+.name-box p { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 1.5rem; }
+.name-box input { width: 100%; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: var(--radius-sm); font-size: 14px; font-family: 'IBM Plex Sans',sans-serif; color: var(--ink); background: var(--bg); margin-bottom: 10px; transition: border-color .15s; }
+.name-box input:focus { outline: none; border-color: var(--accent); background: var(--white); }
+.name-btn { width: 100%; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; margin-bottom: 8px; transition: background .15s; }
+.name-btn:hover { background: var(--accent-mid); }
+.name-btn-ghost { background: none; border: 1.5px solid var(--line); color: var(--ink-soft); width: 100%; padding: 9px; border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; transition: all .15s; }
+.name-btn-ghost:hover { border-color: var(--ink-soft); color: var(--ink); }
+
+/* Sync bar */
+.sync-bar { position: sticky; top: 0; z-index: 100; background: var(--accent); display: flex; align-items: center; justify-content: space-between; padding: 7px 20px; font-size: 11.5px; color: rgba(255,255,255,.55); font-family: 'IBM Plex Mono',monospace; }
+.sync-bar-left { display: flex; align-items: center; gap: 10px; }
+.user-pill { padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 500; background: rgba(255,255,255,.18); color: #fff; cursor: pointer; transition: background .15s; }
+.user-pill:hover { background: rgba(255,255,255,.28); }
+.user-pill.viewer { background: rgba(255,255,255,.1); color: rgba(255,255,255,.5); cursor: default; }
+.sync-status { font-size: 11px; }
+.sync-status.saving { color: rgba(255,220,100,.9); }
+.sync-status.saved  { color: rgba(100,220,140,.9); }
+.sync-status.error  { color: rgba(255,120,100,.9); }
+
+/* Layout */
+.page { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.75rem 5rem; }
+
+/* Header */
+.header { background: var(--accent); border-radius: var(--radius); padding: 2rem 2.25rem 1.75rem; margin-bottom: 1.75rem; position: relative; overflow: hidden; }
+.header::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 80% at 90% -10%,rgba(255,255,255,.06) 0%,transparent 60%),radial-gradient(ellipse 40% 40% at 10% 110%,rgba(255,255,255,.04) 0%,transparent 60%); pointer-events: none; }
+.header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.header-eyebrow { font-family: 'IBM Plex Mono',monospace; font-size: 10px; letter-spacing: .15em; text-transform: uppercase; color: rgba(255,255,255,.4); margin-bottom: 6px; }
+.header-title { font-family: 'Instrument Serif',Georgia,serif; font-size: 26px; color: #fff; line-height: 1.2; letter-spacing: -.01em; }
+.header-title em { font-style: italic; color: rgba(255,255,255,.65); }
+.header-rule { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 4px; }
+#overall-badge { padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 500; background: rgba(255,255,255,.12); color: rgba(255,255,255,.65); border: 1px solid rgba(255,255,255,.15); white-space: nowrap; transition: all .3s; font-family: 'IBM Plex Sans',sans-serif; }
+#overall-badge.hi { background: var(--green-dim); color: var(--green); border-color: var(--green-line); }
+#overall-badge.mid { background: var(--amber-dim); color: var(--amber); border-color: var(--amber-line); }
+#overall-badge.lo { background: var(--red-dim); color: var(--red); border-color: var(--red-line); }
+.header-meta { display: flex; gap: 2rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid rgba(255,255,255,.12); flex-wrap: wrap; }
+.meta-item { display: flex; flex-direction: column; gap: 2px; }
+.meta-label { font-family: 'IBM Plex Mono',monospace; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.35); }
+.meta-value { font-size: 13px; color: rgba(255,255,255,.8); font-weight: 500; }
+
+/* Tabs */
+.tabs { display: flex; gap: 8px; margin-bottom: 1.75rem; flex-wrap: wrap; align-items: center; }
+.tab { padding: 8px 20px; border-radius: 20px; border: 1.5px solid var(--line); background: var(--white); color: var(--ink-soft); font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; transition: all .15s; display: inline-flex; align-items: center; gap: 6px; }
+.tab:hover { border-color: var(--accent); color: var(--accent); }
+.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tab.my-tab { border-color: var(--accent); }
+.tab-cnt { font-family: 'IBM Plex Mono',monospace; font-size: 10px; opacity: .75; }
+.compare-tab { margin-left: auto; }
+
+/* Section label */
+.section-label { font-family: 'IBM Plex Mono',monospace; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-mute); margin: 2rem 0 .75rem; display: flex; align-items: center; gap: 10px; }
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--line-soft); }
+.section-label:first-child { margin-top: 0; }
+
+/* Question card */
+.qcard { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem 1.5rem; margin-bottom: 10px; transition: box-shadow .2s; }
+.qcard:hover { box-shadow: 0 2px 12px rgba(26,58,92,.07); }
+.qcard-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.qcard-info { flex: 1; min-width: 0; }
+.qcode { font-family: 'IBM Plex Mono',monospace; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 3px; }
+.qtitle { font-family: 'Instrument Serif',Georgia,serif; font-size: 16px; color: var(--ink); line-height: 1.3; }
+.qfull { font-size: 12.5px; color: var(--ink-soft); margin-top: 5px; line-height: 1.7; }
+.qweight { flex-shrink: 0; font-family: 'IBM Plex Mono',monospace; font-size: 11px; font-weight: 500; background: var(--line-soft); color: var(--ink-soft); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--line); }
+.rating-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.rating-btns { display: flex; gap: 7px; }
+.rbtn { width: 42px; height: 42px; border-radius: var(--radius-sm); border: 1.5px solid var(--line); background: var(--white); color: var(--ink-soft); font-size: 15px; font-weight: 500; cursor: pointer; font-family: 'IBM Plex Mono',monospace; transition: all .12s; display: flex; align-items: center; justify-content: center; }
+.rbtn:not([disabled]):hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.rbtn[disabled] { cursor: not-allowed; opacity: .55; }
+.rbtn.s1 { background: var(--red); color: #fff; border-color: var(--red); }
+.rbtn.s3 { background: var(--amber); color: #fff; border-color: var(--amber); }
+.rbtn.s5 { background: var(--green); color: #fff; border-color: var(--green); }
+.score-display { font-family: 'IBM Plex Mono',monospace; font-size: 18px; font-weight: 500; min-width: 28px; text-align: center; color: var(--ink-mute); transition: color .2s; }
+.rubric { font-size: 12px; line-height: 1.65; padding: 9px 13px; border-radius: var(--radius-sm); margin-bottom: 10px; border: 1px solid transparent; display: none; }
+.rubric.show { display: block; }
+.rubric-1 { background: var(--red-dim); border-color: var(--red-line); color: #8b1a10; }
+.rubric-3 { background: var(--amber-dim); border-color: var(--amber-line); color: #7a5200; }
+.rubric-5 { background: var(--green-dim); border-color: var(--green-line); color: #0f5c34; }
+.note-input { width: 100%; padding: 9px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--bg); color: var(--ink); font-size: 12.5px; font-family: 'IBM Plex Sans',sans-serif; resize: none; min-height: 52px; transition: border-color .15s, background .15s; }
+.note-input:focus { outline: none; border-color: var(--accent); background: var(--white); }
+.note-input::placeholder { color: var(--ink-mute); }
+.note-input[readonly] { cursor: default; color: var(--ink-soft); }
+
+/* Summary */
+.summary { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem 1.75rem; margin-top: 1.75rem; }
+.summary-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 1.5rem; }
+.stat-card { background: var(--bg); border-radius: var(--radius-sm); border: 1px solid var(--line-soft); padding: 1.1rem 1rem; text-align: center; }
+.stat-label { font-family: 'IBM Plex Mono',monospace; font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 8px; }
+.stat-value { font-family: 'IBM Plex Mono',monospace; font-size: 28px; font-weight: 500; color: var(--accent); }
+.stat-value.band { font-family: 'IBM Plex Sans',sans-serif; font-size: 13px; font-weight: 500; line-height: 1.4; color: var(--ink-mid); padding-top: 4px; }
+.progress-header { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-mute); margin-bottom: 7px; }
+.progress-track { height: 5px; background: var(--line-soft); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width .4s cubic-bezier(.4,0,.2,1); }
+.export-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 24px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 500; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; margin-top: 1.25rem; transition: background .15s; }
+.export-btn:hover { background: var(--accent-mid); }
+.last-update { font-family: 'IBM Plex Mono',monospace; font-size: 10.5px; color: var(--ink-mute); margin-top: 1rem; text-align: right; }
+
+/* Compare view */
+.compare-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem 1.75rem; }
+.compare-legend { display: flex; gap: 1.5rem; flex-wrap: wrap; padding-bottom: 1.25rem; border-bottom: 1px solid var(--line-soft); }
+.legend-item { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-name { font-size: 13px; font-weight: 500; color: var(--ink-mid); }
+.legend-score { font-family: 'IBM Plex Mono',monospace; font-size: 12px; padding: 2px 8px; border-radius: 10px; }
+.legend-score.hi { background: var(--green-dim); color: var(--green); }
+.legend-score.mid { background: var(--amber-dim); color: var(--amber); }
+.legend-score.lo { background: var(--red-dim); color: var(--red); }
+.legend-score:not(.hi):not(.mid):not(.lo) { background: var(--line-soft); color: var(--ink-mute); }
+.compare-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 1.25rem; }
+.compare-table th { padding: 8px 12px; font-family: 'IBM Plex Mono',monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; font-weight: 500; border-bottom: 2px solid var(--line); text-align: center; }
+.compare-table th.ct-qlabel { text-align: left; }
+.compare-table td { padding: 9px 12px; border-bottom: 1px solid var(--line-soft); text-align: center; color: var(--ink-mid); }
+.compare-table td.ct-qlabel { text-align: left; font-size: 12.5px; color: var(--ink); max-width: 180px; }
+.compare-table td.ct-weight { font-family: 'IBM Plex Mono',monospace; font-size: 11px; color: var(--ink-mute); }
+.compare-table tr:hover td { background: var(--bg); }
+.compare-table tfoot td { font-weight: 600; border-top: 2px solid var(--line); border-bottom: none; }
+.ct-score { font-family: 'IBM Plex Mono',monospace; font-size: 15px; font-weight: 500; }
+.ct-score.hi { color: var(--green); }
+.ct-score.mid { color: var(--amber); }
+.ct-score.lo { color: var(--red); }
+.ct-score.none { color: var(--ink-mute); }
+.ct-avg { font-family: 'IBM Plex Mono',monospace; font-size: 13px; font-weight: 600; color: var(--accent); }
+.verdict-pill { display: inline-block; padding: 3px 9px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+.verdict-pill.hi { background: var(--green-dim); color: var(--green); }
+.verdict-pill.mid { background: var(--amber-dim); color: var(--amber); }
+.verdict-pill.lo { background: var(--red-dim); color: var(--red); }
+.verdict-pill:not(.hi):not(.mid):not(.lo) { background: var(--line-soft); color: var(--ink-mute); }
+.empty-compare { text-align: center; padding: 4rem 2rem; color: var(--ink-mute); font-size: 14px; }
+
+@media print { body { background: #fff; } .sync-bar, .export-btn, .name-overlay { display: none; } .qcard { break-inside: avoid; } }
+@media (max-width: 600px) { .page { padding: 1.25rem 1rem 3rem; } .header { padding: 1.5rem 1.25rem; } .header-title { font-size: 20px; } .summary-grid { grid-template-columns: 1fr 1fr; } .summary-grid .stat-card:last-child { grid-column: span 2; } .rbtn { width: 38px; height: 38px; font-size: 14px; } }
+</style>
+</head>
+<body>
+
+<div id="name-overlay" class="name-overlay" style="display:none">
+  <div class="name-box">
+    <div class="name-icon">📋</div>
+    <h2>Finance Manager 面试评分表</h2>
+    <p>Amgreat North America · Operation-Finance</p>
+    <input id="name-input" type="text" placeholder="请输入你的姓名" maxlength="30"
+      onkeydown="if(event.key==='Enter')confirmName()">
+    <button class="name-btn" onclick="confirmName()">开始评分</button>
+    <button class="name-btn-ghost" onclick="viewOnly()">仅查看，不评分</button>
+  </div>
+</div>
+
+<div class="sync-bar">
+  <div class="sync-bar-left">
+    <span id="user-pill" class="user-pill" onclick="changeName()" title="点击修改姓名">…</span>
+    <span>Finance Manager 面试评分表 · Amgreat North America</span>
+  </div>
+  <span id="sync-status" class="sync-status"></span>
+</div>
+
+<div class="page">
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <div class="header-eyebrow">Amgreat North America · Operation-Finance</div>
+        <div class="header-title">Finance Manager<br><em>面试评分表</em></div>
+        <div class="header-rule">评分规则：5 优秀 · 3 达标 · 1 不足</div>
+      </div>
+      <div id="overall-badge">尚未评分</div>
+    </div>
+    <div class="header-meta">
+      <div class="meta-item"><span class="meta-label">候选人</span><span class="meta-value">傅子骁 Zixiao Fu</span></div>
+      <div class="meta-item"><span class="meta-label">年份</span><span class="meta-value" id="yr">2026</span></div>
+      <div class="meta-item"><span class="meta-label">评委人数</span><span class="meta-value" id="judge-count">—</span></div>
+      <div class="meta-item"><span class="meta-label">平均总分</span><span class="meta-value" id="avg-score">—</span></div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs-row"></div>
+
+  <div id="individual-view">
+    <div id="qlist"></div>
+    <div class="summary">
+      <div class="summary-grid">
+        <div class="stat-card"><div class="stat-label">加权总分</div><div class="stat-value" id="wscore">—</div></div>
+        <div class="stat-card"><div class="stat-label">已评题目</div><div class="stat-value" id="rcnt">0/10</div></div>
+        <div class="stat-card"><div class="stat-label">录用建议</div><div class="stat-value band" id="pband">—</div></div>
+      </div>
+      <div class="progress-header"><span>完成进度</span><span id="pct">0%</span></div>
+      <div class="progress-track"><div class="progress-fill" id="pbar" style="width:0%"></div></div>
+      <button class="export-btn" onclick="doExport()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        导出评分报告
+      </button>
+      <div class="last-update" id="last-update"></div>
+    </div>
+  </div>
+
+  <div id="compare-view" style="display:none">
+    <div id="compare-content"></div>
+  </div>
+</div>
+
+<script>
+const QS = [
+  { id:'Q1', mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'月结全流程描述', full:'请描述你在当前或上一个岗位中完成月结（month-end close）的完整流程，包括你负责的具体步骤和遇到过的最大挑战。', w:.08, r1:'描述模糊，未提及具体步骤', r3:'能描述标准月结流程（JE、reconciliation、trial balance），有实际操作经验', r5:'流程完整，有独立负责 close 并解决重大差异的真实案例' },
+  { id:'Q2', mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'费用审核与费控实战', full:'请举一个你发现或拦截异常费用报销的真实案例——你是如何识别问题的？如何在坚持费控原则的同时推动业务部门配合？有没有主动建立或优化过费用报销审核机制（如额度预警、凭证规则、超支上报流程）？', w:.17, r1:'无费用审核经验，或遇阻力后直接妥协放行', r3:'有日常费用报销审核经验，能识别常见违规，处理过跨部门摩擦', r5:'有主动设计或优化费控机制的经验，能量化拦截效果，兼顾原则性与业务协作' },
+  { id:'Q3', mod:'模块二 · NetSuite 与系统工具', mw:'25%', title:'NetSuite 系统深度', full:'你使用 NetSuite 的深度如何？有没有作为系统管理员或超级用户的经验（维护 CoA、配置审批流、培训团队）？', w:.15, r1:'仅用过基础功能', r3:'有日常 AP / AR / GL 操作经验', r5:'担任过区域系统 owner，有配置经验，能培训他人' },
+  { id:'Q4', mod:'模块二 · NetSuite 与系统工具', mw:'25%', title:'Excel / BI Dashboard 搭建', full:'请举一个你用 Excel 或 BI 工具构建财务 dashboard 的案例，数据来源是什么，解决了什么业务问题？', w:.05, r1:'只有基础 Excel 使用', r3:'有 Power Query / Pivot / XLOOKUP 实际案例，有向管理层汇报经验', r5:'有端到端 dashboard 搭建经验（Power BI / Looker），能说明对决策的影响' },
+  { id:'Q5', mod:'模块三 · 收入确认与电商跨境', mw:'20%', title:'Shopify 电商收入对账', full:'你是否有过 Shopify 或类似电商平台的收入对账经验？如何确保 ERP 数据与平台数据一致（含退款、折扣、捆绑销售）？', w:.10, r1:'没有电商财务经验', r3:'有零售或平台对账经验，理解 ASC 606', r5:'有 Shopify / PayPal / Stripe settlement reconciliation 直接操作经验' },
+  { id:'Q6', mod:'模块三 · 收入确认与电商跨境', mw:'20%', title:'跨境内部交易与抵销', full:'你熟悉跨境交易中的内部交易（intercompany transactions）和月度抵销分录吗？请举一个实际案例。', w:.10, r1:'不了解 intercompany 概念', r3:'理解概念，有一定实际经验', r5:'有在多实体环境中独立完成 intercompany reconciliation 和 elimination 的经验' },
+  { id:'Q7', mod:'模块四 · 预算规划与分析', mw:'15%', title:'年度预算、滚动预测与超支拦截', full:'请描述你参与或主导年度预算（AOP）编制的经历：数据怎么收集、怎么跑 BvA？你有没有做过月度或季度滚动预测（Rolling Forecast）？当某部门出现超预算支出时，你的应对机制是什么？', w:.15, r1:'无预算编制经验，或只做过简单汇总', r3:'参与过部门级预算编制，能输出 BvA 报告，有一定差异分析经验', r5:'主导过完整 AOP + 滚动 Forecast 流程，有主动预警超支、向管理层提出费用优化建议并落地的真实案例' },
+  { id:'Q8', mod:'模块五 · 税务合规', mw:'10%', title:'1099 / W-9 / Sales Tax 合规', full:'你有处理过 1099-NEC / MISC 申报、W-9 / W-8 文件维护的经验吗？如何判断多州 Sales Tax Nexus 义务？', w:.10, r1:'无美国税务合规经验', r3:'处理过 1099 申报，了解 Sales Tax 基本概念', r5:'有完整多州 Sales Tax 管理经验，使用过 Avalara / TaxJar，能主动识别合规风险' },
+  { id:'Q9', mod:'模块六 · 软实力与文化契合', mw:'10%', title:'跨部门坚守财务政策', full:'请举一个你必须在跨部门合作中坚持财务政策（如拒绝报销或要求补凭证），遭遇阻力的案例和处理方式。', w:.05, r1:'无相关经验或直接妥协', r3:'能描述以沟通化解阻力的案例，结果合理', r5:'既坚守原则又维护关系，有清晰的沟通策略和正向结果' },
+  { id:'Q10', mod:'模块六 · 软实力与文化契合', mw:'10%', title:'AI 与自动化工具应用', full:'你目前用 AI 或自动化工具辅助财务工作的方式有哪些？举一个具体的效率提升案例。', w:.05, r1:'无实际使用经验', r3:'有使用 ChatGPT 辅助文案 / Python 处理数据等经验', r5:'有系统性将 AI / 自动化嵌入财务流程的经验，能量化效率提升' }
+];
+
+const COLORS = ['#1a3a5c','#c0392b','#1a7a48','#b7770d','#7b2d8b','#0e6e8c'];
+
+let myName = '';
+let myId = '';
+let isViewOnly = false;
+let allData = {};
+let activeId = null;
+
+function nameToId(n) {
+  return n.trim().replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_一-鿿]/g,'').substring(0,40) || 'user';
+}
+
+function initApp() {
+  const stored = localStorage.getItem('sc_name_v2');
+  if (localStorage.getItem('sc_viewonly') === '1') { isViewOnly = true; startApp(); return; }
+  if (stored) { myName = stored; myId = nameToId(myName); startApp(); return; }
+  document.getElementById('name-overlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('name-input').focus(), 80);
+}
+
+function confirmName() {
+  const n = document.getElementById('name-input').value.trim();
+  if (!n) { document.getElementById('name-input').focus(); return; }
+  myName = n; myId = nameToId(n);
+  localStorage.setItem('sc_name_v2', n); localStorage.removeItem('sc_viewonly');
+  document.getElementById('name-overlay').style.display = 'none';
+  startApp();
+}
+
+function viewOnly() {
+  isViewOnly = true; localStorage.setItem('sc_viewonly','1');
+  document.getElementById('name-overlay').style.display = 'none';
+  startApp();
+}
+
+function changeName() {
+  if (isViewOnly) {
+    localStorage.removeItem('sc_viewonly');
+    document.getElementById('name-input').value = '';
+    document.getElementById('name-overlay').style.display = 'flex';
+    setTimeout(() => document.getElementById('name-input').focus(), 80);
+    return;
+  }
+  const n = prompt('修改姓名：', myName);
+  if (!n || !n.trim()) return;
+  myName = n.trim(); myId = nameToId(myName);
+  localStorage.setItem('sc_name_v2', myName);
+  document.getElementById('user-pill').textContent = '✏ ' + myName;
+  activeId = myId; renderTabs(); renderView();
+}
+
+function startApp() {
+  const pill = document.getElementById('user-pill');
+  if (isViewOnly) { pill.textContent = '👁 只读'; pill.classList.add('viewer'); }
+  else pill.textContent = '✏ ' + myName;
+  activeId = isViewOnly ? null : myId;
+  window.__sc.subscribe(handleSnapshot);
+  renderTabs(); renderView();
+}
+
+function handleSnapshot(data) {
+  const firstLoad = Object.keys(allData).length === 0;
+  Object.entries(data).forEach(([id, val]) => {
+    if (id === myId && window.__sc.hasPendingSave) return;
+    allData[id] = val;
+  });
+  updateHeaderStats();
+  renderTabs();
+  if (activeId === null) renderCompare();
+  else if (activeId !== myId || firstLoad) renderIndividual(activeId);
+  else updSum(activeId);
+  const upd = activeId ? allData[activeId]?.updatedAt : null;
+  if (upd) document.getElementById('last-update').textContent = '最后更新：' + new Date(upd).toLocaleString('zh-CN');
+}
+
+function ensureMyData() {
+  if (!allData[myId]) allData[myId] = { displayName: myName, ratings: {}, notes: {}, updatedAt: 0 };
+  allData[myId].displayName = myName;
+}
+
+function setR(qid, val) {
+  if (!myId || isViewOnly) return;
+  ensureMyData();
+  const r = allData[myId].ratings;
+  if (r[qid] === val) delete r[qid]; else r[qid] = val;
+  updBtns(qid); updSum(myId); updateHeaderStats(); scheduleSave();
+}
+
+function setNote(qid, val) {
+  if (!myId || isViewOnly) return;
+  ensureMyData();
+  if (val) allData[myId].notes[qid] = val; else delete allData[myId].notes[qid];
+  scheduleSave();
+}
+
+function scheduleSave() {
+  const d = allData[myId];
+  window.__sc.scheduleSave(myId, { displayName: myName, ratings: {...d.ratings}, notes: {...d.notes}, updatedAt: Date.now() });
+}
+
+function calcW(ratings) {
+  let tot = 0, ws = 0;
+  QS.forEach(q => { const r = ratings[q.id]; if (r !== undefined) { tot += r * q.w; ws += q.w; } });
+  return ws === 0 ? null : (tot / ws).toFixed(2);
+}
+
+function verdict(sc) {
+  if (sc === null) return { lbl:'尚未评分', cls:'' };
+  const s = parseFloat(sc);
+  if (s >= 4.0) return { lbl:'强烈推荐录用', cls:'hi' };
+  if (s >= 3.0) return { lbl:'建议考虑（评估短板）', cls:'mid' };
+  return { lbl:'暂不推荐', cls:'lo' };
+}
+
+function updateHeaderStats() {
+  const ids = Object.keys(allData);
+  document.getElementById('judge-count').textContent = ids.length ? ids.length + ' 人' : '—';
+  const scores = ids.map(id => calcW(allData[id].ratings||{})).filter(Boolean).map(Number);
+  if (!scores.length) {
+    document.getElementById('avg-score').textContent = '—';
+    const bg = document.getElementById('overall-badge'); bg.textContent = '尚未评分'; bg.className = ''; return;
+  }
+  const avg = (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2);
+  document.getElementById('avg-score').textContent = avg;
+  const v = verdict(avg);
+  const bg = document.getElementById('overall-badge');
+  bg.textContent = '平均 ' + avg + ' · ' + v.lbl; bg.className = v.cls;
+}
+
+function updBtns(qid) {
+  if (!allData[activeId]) return;
+  const v = allData[activeId].ratings[qid];
+  [1,3,5].forEach(r => { const b = document.getElementById(`b-${qid}-${r}`); if (b) b.className = 'rbtn'+(v===r?' s'+r:''); });
+  const sd = document.getElementById(`sd-${qid}`);
+  if (sd) { sd.textContent = v!==undefined?v:'—'; sd.style.color = v===5?'var(--green)':v===3?'var(--amber)':v===1?'var(--red)':'var(--ink-mute)'; }
+  const rub = document.getElementById(`rub-${qid}`);
+  if (rub) { const q = QS.find(x=>x.id===qid); if (v===undefined){rub.className='rubric';rub.textContent='';}else{rub.className=`rubric show rubric-${v}`;rub.textContent=`${v}分 — ${v===1?q.r1:v===3?q.r3:q.r5}`;} }
+}
+
+function updSum(id) {
+  const ratings = allData[id]?.ratings || {};
+  const ws = calcW(ratings); const cnt = Object.keys(ratings).length;
+  const v = verdict(ws); const pct = Math.round(cnt/10*100);
+  document.getElementById('wscore').textContent = ws??'—';
+  document.getElementById('rcnt').textContent = `${cnt}/10`;
+  document.getElementById('pband').textContent = v.lbl;
+  document.getElementById('pbar').style.width = pct+'%';
+  document.getElementById('pct').textContent = pct+'%';
+}
+
+function renderTabs() {
+  const row = document.getElementById('tabs-row');
+  const ids = Object.keys(allData);
+  if (myId && !isViewOnly && !ids.includes(myId)) ids.unshift(myId);
+  let html = ids.map(id => {
+    const d = allData[id]; const name = d?.displayName||(id===myId?myName:id);
+    const isMe = id===myId; const isActive = id===activeId;
+    const cnt = Object.keys(d?.ratings||{}).length;
+    const ws = d?calcW(d.ratings||{}):null;
+    const badge = cnt>0?`<span class="tab-cnt">${cnt}/10${ws?' · '+ws:''}</span>`:'';
+    return `<button class="tab${isActive?' active':''}${isMe?' my-tab':''}" onclick="switchTab('${id}')">${isMe?'✏ ':''}${name}${badge}</button>`;
+  }).join('');
+  html += `<button class="tab compare-tab${activeId===null?' active':''}" onclick="switchTab(null)">综合对比</button>`;
+  row.innerHTML = html;
+}
+
+function switchTab(id) { activeId = id; renderTabs(); renderView(); }
+
+function renderView() {
+  if (activeId === null) {
+    document.getElementById('individual-view').style.display = 'none';
+    document.getElementById('compare-view').style.display = 'block';
+    renderCompare();
+  } else {
+    document.getElementById('individual-view').style.display = 'block';
+    document.getElementById('compare-view').style.display = 'none';
+    renderIndividual(activeId); updSum(activeId);
+  }
+}
+
+function renderIndividual(id) {
+  const isMe = id===myId && !isViewOnly;
+  const d = allData[id]||{ratings:{},notes:{}};
+  const ratings = d.ratings||{}; const notes = d.notes||{};
+  const list = document.getElementById('qlist'); list.innerHTML = ''; let lastMod = null;
+  QS.forEach(q => {
+    if (q.mod !== lastMod) { const sl=document.createElement('div'); sl.className='section-label'; sl.textContent=q.mod+' · 权重 '+q.mw; list.appendChild(sl); lastMod=q.mod; }
+    const v=ratings[q.id]; const dis=isMe?'':' disabled';
+    const sdStyle=v===5?'color:var(--green)':v===3?'color:var(--amber)':v===1?'color:var(--red)':'color:var(--ink-mute)';
+    const rubCls=v===undefined?'rubric':`rubric show rubric-${v}`;
+    const rubTxt=v===undefined?'':v+'分 — '+(v===1?q.r1:v===3?q.r3:q.r5);
+    const btnH=[1,3,5].map(r=>`<button class="rbtn${v===r?' s'+r:''}" id="b-${q.id}-${r}"${dis} onclick="setR('${q.id}',${r})">${r}</button>`).join('');
+    const card=document.createElement('div'); card.className='qcard';
+    card.innerHTML=`<div class="qcard-head"><div class="qcard-info"><div class="qcode">${q.id} · ${q.mod.split('·')[0].trim()}</div><div class="qtitle">${q.title}</div><div class="qfull">${q.full}</div></div><span class="qweight">${Math.round(q.w*100)}%</span></div><div class="rating-row"><div class="rating-btns">${btnH}</div><span class="score-display" id="sd-${q.id}" style="${sdStyle}">${v!==undefined?v:'—'}</span></div><div class="${rubCls}" id="rub-${q.id}">${rubTxt}</div><textarea class="note-input" id="nt-${q.id}" placeholder="${isMe?'面试备注…':'（只读）'}" ${isMe?`onchange="setNote('${q.id}',this.value)"`:' readonly'}>${notes[q.id]||''}</textarea>`;
+    list.appendChild(card);
+  });
+}
+
+function renderCompare() {
+  const ids = Object.keys(allData);
+  const el = document.getElementById('compare-content');
+  if (!ids.length) { el.innerHTML='<div class="empty-compare">暂无评分数据<br><span style="font-size:12px;margin-top:6px;display:block">评委进入页面开始打分后，对比数据将实时出现在这里</span></div>'; return; }
+  const legend = ids.map((id,i) => { const name=allData[id]?.displayName||id; const ws=calcW(allData[id]?.ratings||{}); const v=verdict(ws); return `<div class="legend-item"><span class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></span><span class="legend-name">${name}</span><span class="legend-score ${v.cls}">${ws??'—'}</span></div>`; }).join('');
+  const headCols = ids.map((id,i)=>`<th style="color:${COLORS[i%COLORS.length]}">${allData[id]?.displayName||id}</th>`).join('');
+  const bodyRows = QS.map(q => { const scores=ids.map(id=>allData[id]?.ratings?.[q.id]); const valid=scores.filter(s=>s!==undefined); const avg=valid.length?(valid.reduce((a,b)=>a+b,0)/valid.length).toFixed(1):null; const scoreCols=scores.map(s=>`<td class="ct-score ${s===5?'hi':s===3?'mid':s===1?'lo':'none'}">${s??'—'}</td>`).join(''); return `<tr><td class="ct-qlabel">${q.title}</td><td class="ct-weight">${Math.round(q.w*100)}%</td>${scoreCols}<td class="ct-avg">${avg??'—'}</td></tr>`; }).join('');
+  const totalCols = ids.map(id=>{ const ws=calcW(allData[id]?.ratings||{}); const v=verdict(ws); return `<td class="ct-score ${v.cls||'none'}">${ws??'—'}</td>`; }).join('');
+  const verdictCols = ids.map(id=>{ const ws=calcW(allData[id]?.ratings||{}); const v=verdict(ws); return `<td><span class="verdict-pill ${v.cls}">${v.lbl}</span></td>`; }).join('');
+  el.innerHTML=`<div class="compare-card"><div class="compare-legend">${legend}</div><div style="overflow-x:auto"><table class="compare-table"><thead><tr><th class="ct-qlabel">题目</th><th class="ct-weight">权重</th>${headCols}<th>平均</th></tr></thead><tbody>${bodyRows}</tbody><tfoot><tr><td colspan="2">加权总分</td>${totalCols}<td></td></tr><tr><td colspan="2">录用建议</td>${verdictCols}<td></td></tr></tfoot></table></div></div>`;
+}
+
+function doExport() {
+  const id = activeId||myId; if (!id||!allData[id]) return;
+  const d = allData[id]; const ws = calcW(d.ratings||{}); const v = verdict(ws);
+  const lines = ['Finance Manager 面试评分报告','Amgreat North America · Operation-Finance','候选人：傅子骁 Zixiao Fu',`面试官：${d.displayName||id}`,`面试日期：${new Date().toLocaleDateString('zh-CN')}`,`加权总分：${ws??'未完成'}`,`录用建议：${v.lbl}`,'','━━━ 各题得分 ━━━',...QS.map(q=>{const r=d.ratings?.[q.id];const n=d.notes?.[q.id]||'';return `${q.id}（${Math.round(q.w*100)}%）${q.title}：${r!==undefined?r+'分':'未评'}${n?' | 备注：'+n:''}`}),'','━━━ 评分说明 ━━━','≥4.0 强烈推荐录用 | 3.0–3.9 建议考虑（评估短板）| <3.0 暂不推荐'];
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'})); a.download=`面试评分_傅子骁_${d.displayName||id}_${new Date().getFullYear()}.txt`; a.click();
+}
+
+document.getElementById('yr').textContent = new Date().getFullYear();
+window.addEventListener('firestore-ready', initApp);
+</script>
+</body>
+</html>
