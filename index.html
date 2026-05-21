@@ -25,7 +25,7 @@
   // Stay ENTIRELY within the original known-working collection:
   //   scorecard/finance_manager_2026/interviewers/{docId}
   //
-  // Candidates list → document "__candidates__" in that collection
+  // Candidates list → document "xCandidatesList" in that collection
   //   { list: [{id, name, createdAt}, …] }
   //
   // Score documents → "{candidateId}___{interviewerId}" in that collection
@@ -34,7 +34,7 @@
   // The separator "___" (3 underscores) never appears in name-derived IDs.
 
   const COLL = collection(db, "scorecard", "finance_manager_2026", "interviewers");
-  const CAND_DOC = doc(db, "scorecard", "finance_manager_2026", "interviewers", "__candidates__");
+  const CAND_DOC = doc(db, "scorecard", "finance_manager_2026", "interviewers", "xCandidatesList");
   const saveTimers = {};
   let activeScoreUnsub = null;
 
@@ -70,7 +70,7 @@
       activeScoreUnsub = onSnapshot(COLL, snap => {
         const data = {};
         snap.forEach(d => {
-          if (d.id === '__candidates__') return;
+          if (d.id === 'xCandidatesList') return;
           const docData = d.data();
           if (docData.candidateId !== candidateId) return;
           const interId = docData.interviewerId;
