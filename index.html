@@ -92,6 +92,13 @@
       return id;
     },
 
+    async renameCandidate(id, newName) {
+      const snap = await getDoc(CAND_DOC);
+      const list = snap.exists() ? (snap.data().list || []) : [];
+      const updated = list.map(c => c.id === id ? { ...c, name: newName.trim() } : c);
+      await setDoc(CAND_DOC, { list: updated });
+    },
+
     scheduleSave(candidateId, interviewerId, payload) {
       this.hasPendingSave = true;
       const docKey = candidateId + '___' + interviewerId;
@@ -287,9 +294,12 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 
 /* Candidate bar */
 .cand-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; }
-.cand-chip { padding: 7px 16px; border-radius: 20px; border: 1.5px solid var(--line); background: var(--white); color: var(--ink-soft); font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; transition: all .15s; white-space: nowrap; }
+.cand-chip { padding: 7px 14px; border-radius: 20px; border: 1.5px solid var(--line); background: var(--white); color: var(--ink-soft); font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; transition: all .15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .cand-chip:hover { border-color: var(--accent); color: var(--accent); }
 .cand-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(26,58,92,.2); }
+.cand-rename-btn { font-size: 11px; opacity: 0; transition: opacity .15s; background: none; border: none; cursor: pointer; color: inherit; padding: 0; line-height: 1; }
+.cand-chip:hover .cand-rename-btn, .cand-chip.active .cand-rename-btn { opacity: .7; }
+.cand-rename-btn:hover { opacity: 1 !important; }
 .cand-add-btn { padding: 7px 14px; border-radius: 20px; border: 1.5px dashed var(--line); background: transparent; color: var(--ink-mute); font-size: 13px; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; transition: all .15s; display: inline-flex; align-items: center; gap: 5px; }
 .cand-add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .cand-add-form { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
@@ -429,13 +439,32 @@ function renderCandidateBar() {
   const chips = document.getElementById('cand-chips');
   if (!chips) return;
   chips.innerHTML = candidates.map(c =>
-    `<button class="cand-chip${c.id===activeCandidateId?' active':''}" onclick="switchCandidate('${c.id}')">${c.name}</button>`
+    `<button class="cand-chip${c.id===activeCandidateId?' active':''}" onclick="switchCandidate('${c.id}')">
+      ${c.name}
+      <span class="cand-rename-btn" onclick="event.stopPropagation();renameCandidate('${c.id}','${c.name.replace(/'/g,"\\'")}')">✏</span>
+    </button>`
   ).join('');
   // Update header display
   const nameEl = document.getElementById('cand-name-display');
   if (nameEl) {
     const cur = candidates.find(c => c.id === activeCandidateId);
     nameEl.textContent = cur ? cur.name : '—';
+  }
+}
+
+async function renameCandidate(id, currentName) {
+  const newName = prompt('修改候选人姓名：', currentName);
+  if (!newName || !newName.trim() || newName.trim() === currentName) return;
+  try {
+    await window.__sc.renameCandidate(id, newName.trim());
+    // Update local state immediately
+    const c = candidates.find(c => c.id === id);
+    if (c) c.name = newName.trim();
+    renderCandidateBar();
+    const nameEl = document.getElementById('cand-name-display');
+    if (nameEl && id === activeCandidateId) nameEl.textContent = newName.trim();
+  } catch(e) {
+    alert('修改失败，请重试');
   }
 }
 
