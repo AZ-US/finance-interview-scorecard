@@ -8,7 +8,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, onSnapshot, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyB2ft9H5rdZvMKU8P62COYjyNlp_Tglfts",
@@ -21,11 +21,13 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  // fm2026_candidates: list of candidates {name, createdAt}
-  // fm2026_scores: per (candidate × interviewer) score docs
-  const candidatesCol = collection(db, "fm2026_candidates");
-  const scoresCol     = collection(db, "fm2026_scores");
+
+  // All paths stay under "scorecard/" to match existing Firestore rules.
+  // Candidates list: scorecard/_candidates_  →  { list: [{id, name, createdAt}] }
+  // Scores:          scorecard/{candidateId}/interviewers/{interviewerId}
+  const candListDoc = doc(db, "scorecard", "_candidates_");
   const saveTimers = {};
+  let activeScoreUnsub = null;
 
   function setSyncEl(s) {
     const el = document.getElementById('sync-status');
@@ -35,34 +37,44 @@
     else { el.textContent = '同步失败'; el.className = 'sync-status error'; }
   }
 
+  function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
   window.__sc = {
     hasPendingSave: false,
 
+    // Watch the candidates list document
     subscribeCandidates(cb) {
-      return onSnapshot(candidatesCol, snap => {
-        const list = [];
-        snap.forEach(d => list.push({ id: d.id, ...d.data() }));
-        list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      return onSnapshot(candListDoc, snap => {
+        const list = ((snap.data() || {}).list || [])
+          .slice()
+          .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         cb(list);
       }, err => console.error('[Firestore candidates]', err));
     },
 
-    subscribeScores(cb) {
-      return onSnapshot(scoresCol, snap => {
-        // Group all score docs by candidateId → interviewerId
-        const grouped = {};
-        snap.forEach(d => {
-          const data = d.data();
-          if (!grouped[data.candidateId]) grouped[data.candidateId] = {};
-          grouped[data.candidateId][data.interviewerId] = data;
-        });
-        cb(grouped);
+    // Watch interviewers sub-collection for ONE candidate; swap when candidate changes
+    subscribeToCandidate(candidateId, cb) {
+      if (activeScoreUnsub) { activeScoreUnsub(); activeScoreUnsub = null; }
+      if (!candidateId) { cb({}); return; }
+      const col = collection(db, "scorecard", candidateId, "interviewers");
+      activeScoreUnsub = onSnapshot(col, snap => {
+        const data = {};
+        snap.forEach(d => { data[d.id] = d.data(); });
+        cb(data);
       }, err => console.error('[Firestore scores]', err));
     },
 
     async addCandidate(name) {
-      const ref = await addDoc(candidatesCol, { name: name.trim(), createdAt: Date.now() });
-      return ref.id;
+      const entry = { id: genId(), name: name.trim(), createdAt: Date.now() };
+      try {
+        await updateDoc(candListDoc, { list: arrayUnion(entry) });
+      } catch {
+        // Document doesn't exist yet — create it
+        await setDoc(candListDoc, { list: [entry] });
+      }
+      return entry.id;
     },
 
     scheduleSave(candidateId, interviewerId, payload) {
@@ -72,7 +84,8 @@
       setSyncEl('saving');
       saveTimers[key] = setTimeout(async () => {
         try {
-          await setDoc(doc(scoresCol, key), payload);
+          const d = doc(db, "scorecard", candidateId, "interviewers", interviewerId);
+          await setDoc(d, payload);
           setSyncEl('saved');
           this.hasPendingSave = false;
         } catch(e) {
@@ -375,9 +388,8 @@ let isViewOnly = false;
 
 // Multi-candidate state
 let candidates = [];         // [{id, name, createdAt}]
-let allScores  = {};         // {candidateId: {interviewerId: scoreDoc}}
 let activeCandidateId = null;
-let allData = {};            // allScores[activeCandidateId] || {}
+let allData = {};            // interviewers for the active candidate
 
 // Interviewer tab state
 let activeId = null;         // active interviewer tab (null = compare)
@@ -405,12 +417,14 @@ function renderCandidateBar() {
 function switchCandidate(id) {
   if (activeCandidateId === id) return;
   activeCandidateId = id;
-  allData = allScores[id] || {};
+  allData = {};
   activeId = isViewOnly ? null : myId;
   renderCandidateBar();
   updateHeaderStats();
   renderTabs();
   renderView();
+  // Subscribe to this candidate's scores
+  window.__sc.subscribeToCandidate(id, handleScoresUpdate);
 }
 
 function showAddCandidate() {
@@ -444,28 +458,39 @@ async function confirmAddCandidate() {
 }
 
 function handleCandidatesUpdate(list) {
+  const prev = activeCandidateId;
   candidates = list;
-  // Auto-select first candidate if none active
+  // Auto-select first candidate if none active, or fallen back
   if (!activeCandidateId && list.length) activeCandidateId = list[0].id;
-  // If active candidate was deleted, fall back to first
   if (activeCandidateId && !list.find(c => c.id === activeCandidateId)) {
     activeCandidateId = list[0]?.id || null;
   }
-  allData = allScores[activeCandidateId] || {};
   renderCandidateBar();
+  // If active candidate changed, subscribe to its scores
+  if (activeCandidateId !== prev) {
+    allData = {};
+    updateHeaderStats();
+    renderTabs();
+    renderView();
+    window.__sc.subscribeToCandidate(activeCandidateId, handleScoresUpdate);
+  } else {
+    renderTabs();
+    renderView();
+  }
+}
+
+function handleScoresUpdate(data) {
+  // Merge remote data, skip our own if we have a pending save
+  Object.entries(data).forEach(([id, val]) => {
+    if (id === myId && window.__sc.hasPendingSave) return;
+    allData[id] = val;
+  });
+  // Remove stale entries not in remote (e.g., nobody deleted yet — skip for now)
   updateHeaderStats();
   renderTabs();
   renderView();
-}
-
-function handleScoresUpdate(grouped) {
-  allScores = grouped;
-  allData = grouped[activeCandidateId] || {};
-  updateHeaderStats();
-  renderTabs();
-  if (activeId === null) renderCompare();
-  else renderIndividual(activeId);
-  updSum(activeId || myId);
+  const upd = activeId ? allData[activeId]?.updatedAt : null;
+  if (upd) document.getElementById('last-update').textContent = '最后更新：' + new Date(upd).toLocaleString('zh-CN');
 }
 
 // ── Identity ──────────────────────────────────────────
@@ -514,9 +539,8 @@ function startApp() {
   if (isViewOnly) { pill.textContent = '👁 只读'; pill.classList.add('viewer'); }
   else pill.textContent = '✏ ' + myName;
   activeId = isViewOnly ? null : myId;
-  // Subscribe to candidates and all scores
+  // Subscribe to candidates list; score subscription is started inside handleCandidatesUpdate
   window.__sc.subscribeCandidates(handleCandidatesUpdate);
-  window.__sc.subscribeScores(handleScoresUpdate);
 }
 
 // ── Scoring ───────────────────────────────────────────
@@ -662,11 +686,12 @@ function renderTabs() {
 function switchTab(id) { activeId = id; renderTabs(); renderView(); }
 
 function renderView() {
-  // No candidate yet — show prompt
   if (!activeCandidateId) {
+    // No candidates yet — show prompt
     document.getElementById('individual-view').style.display = 'none';
     document.getElementById('compare-view').style.display = 'block';
-    document.getElementById('compare-content').innerHTML = '<div class="cand-empty">还没有候选人<br><span style="font-size:12px;margin-top:6px;display:block">点击上方「＋ 新建候选人」开始评估</span></div>';
+    document.getElementById('compare-content').innerHTML =
+      '<div class="cand-empty">还没有候选人<br><span style="font-size:12px;margin-top:6px;display:block">点击上方「＋ 新建候选人」开始评估</span></div>';
     return;
   }
   if (activeId === null) {
@@ -676,7 +701,8 @@ function renderView() {
   } else {
     document.getElementById('individual-view').style.display = 'block';
     document.getElementById('compare-view').style.display = 'none';
-    renderIndividual(activeId); updSum(activeId);
+    renderIndividual(activeId);
+    updSum(activeId);
   }
 }
 
