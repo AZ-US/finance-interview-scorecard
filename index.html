@@ -8,7 +8,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, doc, getDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyB2ft9H5rdZvMKU8P62COYjyNlp_Tglfts",
@@ -22,11 +22,19 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // All paths use EXACTLY the same pattern as existing working rules:
-  //   scorecard/{document}/interviewers/{id}
-  // Candidates: scorecard/_meta_/interviewers/{candidateId}  ← same structure!
-  // Scores:     scorecard/{candidateId}/interviewers/{interviewerId}
-  const metaCandCol = collection(db, "scorecard", "_meta_", "interviewers");
+  // Stay ENTIRELY within the original known-working collection:
+  //   scorecard/finance_manager_2026/interviewers/{docId}
+  //
+  // Candidates list → document "__candidates__" in that collection
+  //   { list: [{id, name, createdAt}, …] }
+  //
+  // Score documents → "{candidateId}___{interviewerId}" in that collection
+  //   { candidateId, interviewerId, displayName, ratings, notes, updatedAt }
+  //
+  // The separator "___" (3 underscores) never appears in name-derived IDs.
+
+  const COLL = collection(db, "scorecard", "finance_manager_2026", "interviewers");
+  const CAND_DOC = doc(db, "scorecard", "finance_manager_2026", "interviewers", "__candidates__");
   const saveTimers = {};
   let activeScoreUnsub = null;
 
@@ -45,46 +53,55 @@
   window.__sc = {
     hasPendingSave: false,
 
-    // Watch candidates — stored as docs in scorecard/_meta_/interviewers/
+    // Watch candidates list document (single doc subscription — no list permission needed)
     subscribeCandidates(cb) {
-      return onSnapshot(metaCandCol, snap => {
-        const list = snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
+      return onSnapshot(CAND_DOC, snap => {
+        const list = ((snap.data() || {}).list || [])
+          .slice()
           .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         cb(list);
       }, err => console.error('[Firestore candidates]', err));
     },
 
-    // Watch interviewers sub-collection for ONE candidate; swap when candidate changes
+    // Watch all score docs for one candidate (filter by candidateId field)
     subscribeToCandidate(candidateId, cb) {
       if (activeScoreUnsub) { activeScoreUnsub(); activeScoreUnsub = null; }
       if (!candidateId) { cb({}); return; }
-      const col = collection(db, "scorecard", candidateId, "interviewers");
-      activeScoreUnsub = onSnapshot(col, snap => {
+      activeScoreUnsub = onSnapshot(COLL, snap => {
         const data = {};
-        snap.forEach(d => { data[d.id] = d.data(); });
+        snap.forEach(d => {
+          if (d.id === '__candidates__') return;
+          const docData = d.data();
+          if (docData.candidateId !== candidateId) return;
+          const interId = docData.interviewerId;
+          if (interId) data[interId] = docData;
+        });
         cb(data);
       }, err => console.error('[Firestore scores]', err));
     },
 
     async addCandidate(name) {
       const id = genId();
-      await setDoc(doc(db, "scorecard", "_meta_", "interviewers", id), {
-        name: name.trim(),
-        createdAt: Date.now()
+      const snap = await getDoc(CAND_DOC);
+      const existing = snap.exists() ? (snap.data().list || []) : [];
+      await setDoc(CAND_DOC, {
+        list: [...existing, { id, name: name.trim(), createdAt: Date.now() }]
       });
       return id;
     },
 
     scheduleSave(candidateId, interviewerId, payload) {
       this.hasPendingSave = true;
-      const key = candidateId + '_' + interviewerId;
-      clearTimeout(saveTimers[key]);
+      const docKey = candidateId + '___' + interviewerId;
+      clearTimeout(saveTimers[docKey]);
       setSyncEl('saving');
-      saveTimers[key] = setTimeout(async () => {
+      saveTimers[docKey] = setTimeout(async () => {
         try {
-          const d = doc(db, "scorecard", candidateId, "interviewers", interviewerId);
-          await setDoc(d, payload);
+          await setDoc(doc(COLL, docKey), {
+            ...payload,
+            candidateId,
+            interviewerId
+          });
           setSyncEl('saved');
           this.hasPendingSave = false;
         } catch(e) {
