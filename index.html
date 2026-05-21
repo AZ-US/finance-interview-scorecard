@@ -22,10 +22,11 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // All paths use scorecard/{doc}/{subcollection}/{id} — same pattern as existing rules.
-  // Candidates: scorecard/_shared_/candidates/{candidateId}
+  // All paths use EXACTLY the same pattern as existing working rules:
+  //   scorecard/{document}/interviewers/{id}
+  // Candidates: scorecard/_meta_/interviewers/{candidateId}  ← same structure!
   // Scores:     scorecard/{candidateId}/interviewers/{interviewerId}
-  const candCol = collection(db, "scorecard", "_shared_", "candidates");
+  const metaCandCol = collection(db, "scorecard", "_meta_", "interviewers");
   const saveTimers = {};
   let activeScoreUnsub = null;
 
@@ -44,9 +45,9 @@
   window.__sc = {
     hasPendingSave: false,
 
-    // Watch candidates sub-collection (one doc per candidate)
+    // Watch candidates — stored as docs in scorecard/_meta_/interviewers/
     subscribeCandidates(cb) {
-      return onSnapshot(candCol, snap => {
+      return onSnapshot(metaCandCol, snap => {
         const list = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
@@ -68,7 +69,7 @@
 
     async addCandidate(name) {
       const id = genId();
-      await setDoc(doc(db, "scorecard", "_shared_", "candidates", id), {
+      await setDoc(doc(db, "scorecard", "_meta_", "interviewers", id), {
         name: name.trim(),
         createdAt: Date.now()
       });
