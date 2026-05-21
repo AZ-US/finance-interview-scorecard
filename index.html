@@ -161,6 +161,21 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 .note-input::placeholder { color: var(--ink-mute); }
 .note-input[readonly] { cursor: default; color: var(--ink-soft); }
 
+/* Slider */
+.slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 2px 0; }
+.slider-row.hidden { display: none; }
+.sl-label { font-family: 'IBM Plex Mono',monospace; font-size: 10px; color: var(--ink-mute); flex-shrink: 0; user-select: none; }
+.score-slider { -webkit-appearance: none; appearance: none; flex: 1; height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--red) 0%, var(--amber) 50%, var(--green) 100%); outline: none; cursor: pointer; transition: opacity .15s; }
+.score-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--white); border: 2.5px solid var(--accent); cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,.18); transition: border-color .15s, transform .1s; }
+.score-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.score-slider::-webkit-slider-thumb:active { transform: scale(1.05); border-color: var(--accent-mid); }
+.score-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: var(--white); border: 2.5px solid var(--accent); cursor: pointer; box-shadow: 0 1px 5px rgba(0,0,0,.18); }
+.score-slider::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--red) 0%, var(--amber) 50%, var(--green) 100%); border: none; }
+.score-slider:disabled { opacity: .35; cursor: not-allowed; }
+.score-slider:disabled::-webkit-slider-thumb { cursor: not-allowed; }
+.slider-ticks { display: flex; justify-content: space-between; padding: 0 10px; margin-top: -4px; margin-bottom: 6px; }
+.slider-ticks span { font-family: 'IBM Plex Mono',monospace; font-size: 9px; color: var(--ink-mute); opacity: .5; width: 20px; text-align: center; }
+
 /* Summary */
 .summary { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem 1.75rem; margin-top: 1.75rem; }
 .summary-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 1.5rem; }
@@ -388,6 +403,20 @@ function setR(qid, val) {
   updBtns(qid); updSum(myId); updateHeaderStats(); scheduleSave();
 }
 
+function setSlider(qid, val) {
+  if (!myId || isViewOnly) return;
+  ensureMyData();
+  allData[myId].ratings[qid] = val;
+  updBtns(qid); updSum(myId); updateHeaderStats(); scheduleSave();
+}
+
+function scoreColor(v) {
+  if (v === undefined) return 'var(--ink-mute)';
+  if (v >= 4) return 'var(--green)';
+  if (v >= 2.5) return 'var(--amber)';
+  return 'var(--red)';
+}
+
 function setNote(qid, val) {
   if (!myId || isViewOnly) return;
   ensureMyData();
@@ -432,11 +461,37 @@ function updateHeaderStats() {
 function updBtns(qid) {
   if (!allData[activeId]) return;
   const v = allData[activeId].ratings[qid];
+  // Buttons: highlight only at exact 1/3/5
   [1,3,5].forEach(r => { const b = document.getElementById(`b-${qid}-${r}`); if (b) b.className = 'rbtn'+(v===r?' s'+r:''); });
+  // Score display
   const sd = document.getElementById(`sd-${qid}`);
-  if (sd) { sd.textContent = v!==undefined?v:'—'; sd.style.color = v===5?'var(--green)':v===3?'var(--amber)':v===1?'var(--red)':'var(--ink-mute)'; }
+  if (sd) { sd.textContent = v!==undefined?v:'—'; sd.style.color = scoreColor(v); }
+  // Slider: sync value and visibility
+  const sl = document.getElementById(`slider-${qid}`);
+  if (sl && v !== undefined) sl.value = v;
+  const slRow = document.getElementById(`sl-${qid}`);
+  if (slRow) { if (v !== undefined) slRow.classList.remove('hidden'); else slRow.classList.add('hidden'); }
+  // Rubric
+  updRubric(qid);
+}
+
+function updRubric(qid) {
   const rub = document.getElementById(`rub-${qid}`);
-  if (rub) { const q = QS.find(x=>x.id===qid); if (v===undefined){rub.className='rubric';rub.textContent='';}else{rub.className=`rubric show rubric-${v}`;rub.textContent=`${v}分 — ${v===1?q.r1:v===3?q.r3:q.r5}`;} }
+  if (!rub) return;
+  const v = allData[activeId]?.ratings?.[qid];
+  if (v === undefined) { rub.className = 'rubric'; rub.textContent = ''; return; }
+  const q = QS.find(x => x.id === qid);
+  let cls, txt;
+  if (v < 2.5) cls = 'rubric-1';
+  else if (v < 4) cls = 'rubric-3';
+  else cls = 'rubric-5';
+  if (v === 1) txt = `1分 — ${q.r1}`;
+  else if (v === 3) txt = `3分 — ${q.r3}`;
+  else if (v === 5) txt = `5分 — ${q.r5}`;
+  else if (v < 3) txt = `${v}分 — 介于「不足」(1) 与「达标」(3) 之间`;
+  else txt = `${v}分 — 介于「达标」(3) 与「优秀」(5) 之间`;
+  rub.className = `rubric show ${cls}`;
+  rub.textContent = txt;
 }
 
 function updSum(id) {
@@ -488,12 +543,15 @@ function renderIndividual(id) {
   QS.forEach(q => {
     if (q.mod !== lastMod) { const sl=document.createElement('div'); sl.className='section-label'; sl.textContent=q.mod+' · 权重 '+q.mw; list.appendChild(sl); lastMod=q.mod; }
     const v=ratings[q.id]; const dis=isMe?'':' disabled';
-    const sdStyle=v===5?'color:var(--green)':v===3?'color:var(--amber)':v===1?'color:var(--red)':'color:var(--ink-mute)';
-    const rubCls=v===undefined?'rubric':`rubric show rubric-${v}`;
-    const rubTxt=v===undefined?'':v+'分 — '+(v===1?q.r1:v===3?q.r3:q.r5);
+    const sdStyle='color:'+scoreColor(v);
+    const rubCls=v===undefined?'rubric':`rubric show ${v<2.5?'rubric-1':v<4?'rubric-3':'rubric-5'}`;
+    const rubTxt=v===undefined?'':(v===1?`1分 — ${q.r1}`:v===3?`3分 — ${q.r3}`:v===5?`5分 — ${q.r5}`:v<3?`${v}分 — 介于「不足」(1) 与「达标」(3) 之间`:`${v}分 — 介于「达标」(3) 与「优秀」(5) 之间`);
     const btnH=[1,3,5].map(r=>`<button class="rbtn${v===r?' s'+r:''}" id="b-${q.id}-${r}"${dis} onclick="setR('${q.id}',${r})">${r}</button>`).join('');
+    const slHidden = v===undefined?' hidden':'';
+    const slVal = v!==undefined?v:3;
+    const slDis = isMe?'':' disabled';
     const card=document.createElement('div'); card.className='qcard';
-    card.innerHTML=`<div class="qcard-head"><div class="qcard-info"><div class="qcode">${q.id} · ${q.mod.split('·')[0].trim()}</div><div class="qtitle">${q.title}</div><div class="qfull">${q.full}</div></div><span class="qweight">${Math.round(q.w*100)}%</span></div><div class="rating-row"><div class="rating-btns">${btnH}</div><span class="score-display" id="sd-${q.id}" style="${sdStyle}">${v!==undefined?v:'—'}</span></div><div class="${rubCls}" id="rub-${q.id}">${rubTxt}</div><textarea class="note-input" id="nt-${q.id}" placeholder="${isMe?'面试备注…':'（只读）'}" ${isMe?`onchange="setNote('${q.id}',this.value)"`:' readonly'}>${notes[q.id]||''}</textarea>`;
+    card.innerHTML=`<div class="qcard-head"><div class="qcard-info"><div class="qcode">${q.id} · ${q.mod.split('·')[0].trim()}</div><div class="qtitle">${q.title}</div><div class="qfull">${q.full}</div></div><span class="qweight">${Math.round(q.w*100)}%</span></div><div class="rating-row"><div class="rating-btns">${btnH}</div><span class="score-display" id="sd-${q.id}" style="${sdStyle}">${v!==undefined?v:'—'}</span></div><div class="slider-row${slHidden}" id="sl-${q.id}"><span class="sl-label">1</span><input type="range" class="score-slider" id="slider-${q.id}" min="1" max="5" step="0.5" value="${slVal}"${slDis} oninput="setSlider('${q.id}',parseFloat(this.value))"><span class="sl-label">5</span></div><div class="${rubCls}" id="rub-${q.id}">${rubTxt}</div><textarea class="note-input" id="nt-${q.id}" placeholder="${isMe?'面试备注…':'（只读）'}" ${isMe?`onchange="setNote('${q.id}',this.value)"`:' readonly'}>${notes[q.id]||''}</textarea>`;
     list.appendChild(card);
   });
 }
