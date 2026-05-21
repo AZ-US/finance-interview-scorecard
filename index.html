@@ -8,7 +8,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, doc, getDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyB2ft9H5rdZvMKU8P62COYjyNlp_Tglfts",
@@ -68,12 +68,9 @@
 
     async addCandidate(name) {
       const entry = { id: genId(), name: name.trim(), createdAt: Date.now() };
-      try {
-        await updateDoc(candListDoc, { list: arrayUnion(entry) });
-      } catch {
-        // Document doesn't exist yet — create it
-        await setDoc(candListDoc, { list: [entry] });
-      }
+      const snap = await getDoc(candListDoc);
+      const existing = snap.exists() ? (snap.data().list || []) : [];
+      await setDoc(candListDoc, { list: [...existing, entry] });
       return entry.id;
     },
 
@@ -447,11 +444,21 @@ async function confirmAddCandidate() {
   input.disabled = true;
   try {
     const newId = await window.__sc.addCandidate(name);
+    // Immediately update local state — don't wait for Firestore snapshot
+    if (!candidates.find(c => c.id === newId)) {
+      candidates.push({ id: newId, name, createdAt: Date.now() });
+    }
+    activeCandidateId = newId;
+    allData = {};
     hideAddCandidate();
-    // Firestore snapshot will update candidates list and switch automatically
-    activeCandidateId = newId; // pre-select the new candidate
+    renderCandidateBar();
+    updateHeaderStats();
+    renderTabs();
+    renderView();
+    window.__sc.subscribeToCandidate(newId, handleScoresUpdate);
   } catch(e) {
     console.error('Add candidate failed', e);
+    alert('创建候选人失败，请检查网络后重试');
   } finally {
     input.disabled = false;
   }
