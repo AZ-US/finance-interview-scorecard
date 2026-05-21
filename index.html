@@ -8,7 +8,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, getDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyB2ft9H5rdZvMKU8P62COYjyNlp_Tglfts",
@@ -22,10 +22,10 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
-  // All paths stay under "scorecard/" to match existing Firestore rules.
-  // Candidates list: scorecard/_candidates_  →  { list: [{id, name, createdAt}] }
-  // Scores:          scorecard/{candidateId}/interviewers/{interviewerId}
-  const candListDoc = doc(db, "scorecard", "_candidates_");
+  // All paths use scorecard/{doc}/{subcollection}/{id} — same pattern as existing rules.
+  // Candidates: scorecard/_shared_/candidates/{candidateId}
+  // Scores:     scorecard/{candidateId}/interviewers/{interviewerId}
+  const candCol = collection(db, "scorecard", "_shared_", "candidates");
   const saveTimers = {};
   let activeScoreUnsub = null;
 
@@ -44,11 +44,11 @@
   window.__sc = {
     hasPendingSave: false,
 
-    // Watch the candidates list document
+    // Watch candidates sub-collection (one doc per candidate)
     subscribeCandidates(cb) {
-      return onSnapshot(candListDoc, snap => {
-        const list = ((snap.data() || {}).list || [])
-          .slice()
+      return onSnapshot(candCol, snap => {
+        const list = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
         cb(list);
       }, err => console.error('[Firestore candidates]', err));
@@ -67,11 +67,12 @@
     },
 
     async addCandidate(name) {
-      const entry = { id: genId(), name: name.trim(), createdAt: Date.now() };
-      const snap = await getDoc(candListDoc);
-      const existing = snap.exists() ? (snap.data().list || []) : [];
-      await setDoc(candListDoc, { list: [...existing, entry] });
-      return entry.id;
+      const id = genId();
+      await setDoc(doc(db, "scorecard", "_shared_", "candidates", id), {
+        name: name.trim(),
+        createdAt: Date.now()
+      });
+      return id;
     },
 
     scheduleSave(candidateId, interviewerId, payload) {
