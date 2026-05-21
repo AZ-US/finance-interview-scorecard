@@ -258,7 +258,7 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
     <div class="summary">
       <div class="summary-grid">
         <div class="stat-card"><div class="stat-label">加权总分</div><div class="stat-value" id="wscore">—</div></div>
-        <div class="stat-card"><div class="stat-label">已评题目</div><div class="stat-value" id="rcnt">0/10</div></div>
+        <div class="stat-card"><div class="stat-label">已评题目</div><div class="stat-value" id="rcnt">0/13</div></div>
         <div class="stat-card"><div class="stat-label">录用建议</div><div class="stat-value band" id="pband">—</div></div>
       </div>
       <div class="progress-header"><span>完成进度</span><span id="pct">0%</span></div>
@@ -277,17 +277,27 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 </div>
 
 <script>
+const TOTAL_Q = 13;
 const QS = [
-  { id:'Q1', mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'月结全流程描述', full:'请描述你在当前或上一个岗位中完成月结（month-end close）的完整流程，包括你负责的具体步骤和遇到过的最大挑战。', w:.08, r1:'描述模糊，未提及具体步骤', r3:'能描述标准月结流程（JE、reconciliation、trial balance），有实际操作经验', r5:'流程完整，有独立负责 close 并解决重大差异的真实案例' },
-  { id:'Q2', mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'费用审核与费控实战', full:'请举一个你发现或拦截异常费用报销的真实案例——你是如何识别问题的？如何在坚持费控原则的同时推动业务部门配合？有没有主动建立或优化过费用报销审核机制（如额度预警、凭证规则、超支上报流程）？', w:.17, r1:'无费用审核经验，或遇阻力后直接妥协放行', r3:'有日常费用报销审核经验，能识别常见违规，处理过跨部门摩擦', r5:'有主动设计或优化费控机制的经验，能量化拦截效果，兼顾原则性与业务协作' },
-  { id:'Q3', mod:'模块二 · NetSuite 与系统工具', mw:'25%', title:'NetSuite 系统深度', full:'你使用 NetSuite 的深度如何？有没有作为系统管理员或超级用户的经验（维护 CoA、配置审批流、培训团队）？', w:.15, r1:'仅用过基础功能', r3:'有日常 AP / AR / GL 操作经验', r5:'担任过区域系统 owner，有配置经验，能培训他人' },
-  { id:'Q4', mod:'模块二 · NetSuite 与系统工具', mw:'25%', title:'Excel / BI Dashboard 搭建', full:'请举一个你用 Excel 或 BI 工具构建财务 dashboard 的案例，数据来源是什么，解决了什么业务问题？', w:.05, r1:'只有基础 Excel 使用', r3:'有 Power Query / Pivot / XLOOKUP 实际案例，有向管理层汇报经验', r5:'有端到端 dashboard 搭建经验（Power BI / Looker），能说明对决策的影响' },
-  { id:'Q5', mod:'模块三 · 收入确认与电商跨境', mw:'20%', title:'Shopify 电商收入对账', full:'你是否有过 Shopify 或类似电商平台的收入对账经验？如何确保 ERP 数据与平台数据一致（含退款、折扣、捆绑销售）？', w:.10, r1:'没有电商财务经验', r3:'有零售或平台对账经验，理解 ASC 606', r5:'有 Shopify / PayPal / Stripe settlement reconciliation 直接操作经验' },
-  { id:'Q6', mod:'模块三 · 收入确认与电商跨境', mw:'20%', title:'跨境内部交易与抵销', full:'你熟悉跨境交易中的内部交易（intercompany transactions）和月度抵销分录吗？请举一个实际案例。', w:.10, r1:'不了解 intercompany 概念', r3:'理解概念，有一定实际经验', r5:'有在多实体环境中独立完成 intercompany reconciliation 和 elimination 的经验' },
+  // ── 模块一 · 全周期会计与财务合规 25% ──
+  { id:'Q1', mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'月结全流程描述', full:'请描述你在当前或上一个岗位中完成月结（month-end close）的完整流程，包括你负责的具体步骤和遇到过的最大挑战。', w:.07, r1:'描述模糊，未提及具体步骤', r3:'能描述标准月结流程（JE、reconciliation、trial balance），有实际操作经验', r5:'流程完整，有独立负责 close 并解决重大差异的真实案例' },
+  { id:'Q2', mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'费用审核与费控实战', full:'请举一个你发现或拦截异常费用报销的真实案例——你是如何识别问题的？如何在坚持费控原则的同时推动业务部门配合？有没有主动建立或优化过费用报销审核机制（如额度预警、凭证规则、超支上报流程）？', w:.10, r1:'无费用审核经验，或遇阻力后直接妥协放行', r3:'有日常费用报销审核经验，能识别常见违规，处理过跨部门摩擦', r5:'有主动设计或优化费控机制的经验，能量化拦截效果，兼顾原则性与业务协作' },
+  { id:'Q11', mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'US GAAP ToB 实操', full:'请描述你在 US GAAP 框架下处理 ToB 业务的经验：如何管理 AR 账龄、返利折扣的账务处理？收入确认（ASC 606）中遇到过哪些判断难点？', w:.08, r1:'不熟悉 US GAAP，无 ToB 财务经验', r3:'有 US GAAP 下 AR / Revenue 日常处理经验，了解 ASC 606 基本要求', r5:'有独立处理复杂返利结构、AR 账龄分析并推动坏账政策的实战经验，能清晰阐述 ASC 606 五步法应用' },
+  // ── 模块二 · NetSuite 与系统工具 15% ──
+  { id:'Q3', mod:'模块二 · NetSuite 与系统工具', mw:'15%', title:'NetSuite 系统深度', full:'你使用 NetSuite 的深度如何？有没有作为系统管理员或超级用户的经验（维护 CoA、配置审批流、培训团队）？', w:.10, r1:'仅用过基础功能', r3:'有日常 AP / AR / GL 操作经验', r5:'担任过区域系统 owner，有配置经验，能培训他人' },
+  { id:'Q4', mod:'模块二 · NetSuite 与系统工具', mw:'15%', title:'Excel / BI Dashboard 搭建', full:'请举一个你用 Excel 或 BI 工具构建财务 dashboard 的案例，数据来源是什么，解决了什么业务问题？', w:.05, r1:'只有基础 Excel 使用', r3:'有 Power Query / Pivot / XLOOKUP 实际案例，有向管理层汇报经验', r5:'有端到端 dashboard 搭建经验（Power BI / Looker），能说明对决策的影响' },
+  // ── 模块三 · 收入确认与电商跨境 15% ──
+  { id:'Q5', mod:'模块三 · 收入确认与电商跨境', mw:'15%', title:'Shopify 电商收入对账', full:'你是否有过 Shopify 或类似电商平台的收入对账经验？如何确保 ERP 数据与平台数据一致（含退款、折扣、捆绑销售）？', w:.08, r1:'没有电商财务经验', r3:'有零售或平台对账经验，理解 ASC 606', r5:'有 Shopify / PayPal / Stripe settlement reconciliation 直接操作经验' },
+  { id:'Q6', mod:'模块三 · 收入确认与电商跨境', mw:'15%', title:'跨境内部交易与抵销', full:'你熟悉跨境交易中的内部交易（intercompany transactions）和月度抵销分录吗？请举一个实际案例。', w:.07, r1:'不了解 intercompany 概念', r3:'理解概念，有一定实际经验', r5:'有在多实体环境中独立完成 intercompany reconciliation 和 elimination 的经验' },
+  // ── 模块四 · 预算规划与分析 15% ──
   { id:'Q7', mod:'模块四 · 预算规划与分析', mw:'15%', title:'年度预算、滚动预测与超支拦截', full:'请描述你参与或主导年度预算（AOP）编制的经历：数据怎么收集、怎么跑 BvA？你有没有做过月度或季度滚动预测（Rolling Forecast）？当某部门出现超预算支出时，你的应对机制是什么？', w:.15, r1:'无预算编制经验，或只做过简单汇总', r3:'参与过部门级预算编制，能输出 BvA 报告，有一定差异分析经验', r5:'主导过完整 AOP + 滚动 Forecast 流程，有主动预警超支、向管理层提出费用优化建议并落地的真实案例' },
+  // ── 模块五 · 税务合规 10% ──
   { id:'Q8', mod:'模块五 · 税务合规', mw:'10%', title:'1099 / W-9 / Sales Tax 合规', full:'你有处理过 1099-NEC / MISC 申报、W-9 / W-8 文件维护的经验吗？如何判断多州 Sales Tax Nexus 义务？', w:.10, r1:'无美国税务合规经验', r3:'处理过 1099 申报，了解 Sales Tax 基本概念', r5:'有完整多州 Sales Tax 管理经验，使用过 Avalara / TaxJar，能主动识别合规风险' },
-  { id:'Q9', mod:'模块六 · 软实力与文化契合', mw:'10%', title:'跨部门坚守财务政策', full:'请举一个你必须在跨部门合作中坚持财务政策（如拒绝报销或要求补凭证），遭遇阻力的案例和处理方式。', w:.05, r1:'无相关经验或直接妥协', r3:'能描述以沟通化解阻力的案例，结果合理', r5:'既坚守原则又维护关系，有清晰的沟通策略和正向结果' },
-  { id:'Q10', mod:'模块六 · 软实力与文化契合', mw:'10%', title:'AI 与自动化工具应用', full:'你目前用 AI 或自动化工具辅助财务工作的方式有哪些？举一个具体的效率提升案例。', w:.05, r1:'无实际使用经验', r3:'有使用 ChatGPT 辅助文案 / Python 处理数据等经验', r5:'有系统性将 AI / 自动化嵌入财务流程的经验，能量化效率提升' }
+  // ── 模块六 · 软实力与文化契合 20% ──
+  { id:'Q9', mod:'模块六 · 软实力与文化契合', mw:'20%', title:'跨部门坚守财务政策', full:'请举一个你必须在跨部门合作中坚持财务政策（如拒绝报销或要求补凭证），遭遇阻力的案例和处理方式。公司需要"敢拦超支、敢顶部门压力"的人——请用具体事例说明你的原则性。', w:.08, r1:'无相关经验或直接妥协', r3:'能描述以沟通化解阻力的案例，结果合理', r5:'既坚守原则又维护关系，有清晰的沟通策略和正向结果，展现出强烈的原则性' },
+  { id:'Q12', mod:'模块六 · 软实力与文化契合', mw:'20%', title:'中英文工作语言能力', full:'请用英文描述你上一个岗位的核心职责（1-2分钟），然后切换回中文总结。评估候选人中英文听说读写的流畅度和切换自如程度。', w:.05, r1:'中英文之一明显不流畅，难以胜任双语工作环境', r3:'中英文均可基本沟通，书面表达基本准确，偶有不流畅', r5:'中英文均为工作语言水平，表达流畅自如，切换无障碍，书面沟通专业' },
+  { id:'Q13', mod:'模块六 · 软实力与文化契合', mw:'20%', title:'专业资质 AICPA / CPA', full:'你的 AICPA 或 CPA 考试进度如何？已通过哪些科目？是否有其他财务相关专业认证？', w:.03, r1:'无相关资质且无备考计划', r3:'正在备考或已通过 1-2 科，有明确时间规划', r5:'已通过全科或仅剩 1 科，持有 CPA license 或其他高含金量认证（如 CMA）' },
+  { id:'Q10', mod:'模块六 · 软实力与文化契合', mw:'20%', title:'AI 与自动化工具应用', full:'你目前用 AI 或自动化工具辅助财务工作的方式有哪些？举一个具体的效率提升案例。', w:.04, r1:'无实际使用经验', r3:'有使用 ChatGPT 辅助文案 / Python 处理数据等经验', r5:'有系统性将 AI / 自动化嵌入财务流程的经验，能量化效率提升' }
 ];
 
 const COLORS = ['#1a3a5c','#c0392b','#1a7a48','#b7770d','#7b2d8b','#0e6e8c'];
@@ -432,9 +442,9 @@ function updBtns(qid) {
 function updSum(id) {
   const ratings = allData[id]?.ratings || {};
   const ws = calcW(ratings); const cnt = Object.keys(ratings).length;
-  const v = verdict(ws); const pct = Math.round(cnt/10*100);
+  const v = verdict(ws); const pct = Math.round(cnt/TOTAL_Q*100);
   document.getElementById('wscore').textContent = ws??'—';
-  document.getElementById('rcnt').textContent = `${cnt}/10`;
+  document.getElementById('rcnt').textContent = `${cnt}/${TOTAL_Q}`;
   document.getElementById('pband').textContent = v.lbl;
   document.getElementById('pbar').style.width = pct+'%';
   document.getElementById('pct').textContent = pct+'%';
@@ -449,7 +459,7 @@ function renderTabs() {
     const isMe = id===myId; const isActive = id===activeId;
     const cnt = Object.keys(d?.ratings||{}).length;
     const ws = d?calcW(d.ratings||{}):null;
-    const badge = cnt>0?`<span class="tab-cnt">${cnt}/10${ws?' · '+ws:''}</span>`:'';
+    const badge = cnt>0?`<span class="tab-cnt">${cnt}/${TOTAL_Q}${ws?' · '+ws:''}</span>`:'';
     return `<button class="tab${isActive?' active':''}${isMe?' my-tab':''}" onclick="switchTab('${id}')">${isMe?'✏ ':''}${name}${badge}</button>`;
   }).join('');
   html += `<button class="tab compare-tab${activeId===null?' active':''}" onclick="switchTab(null)">综合对比</button>`;
