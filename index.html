@@ -8,7 +8,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, collection, doc, onSnapshot, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyB2ft9H5rdZvMKU8P62COYjyNlp_Tglfts",
@@ -21,8 +21,11 @@
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  const colRef = collection(db, "scorecard", "finance_manager_2026", "interviewers");
-  let saveTimer = null;
+  // fm2026_candidates: list of candidates {name, createdAt}
+  // fm2026_scores: per (candidate × interviewer) score docs
+  const candidatesCol = collection(db, "fm2026_candidates");
+  const scoresCol     = collection(db, "fm2026_scores");
+  const saveTimers = {};
 
   function setSyncEl(s) {
     const el = document.getElementById('sync-status');
@@ -34,20 +37,42 @@
 
   window.__sc = {
     hasPendingSave: false,
-    subscribe(cb) {
-      return onSnapshot(colRef, snap => {
-        const data = {};
-        snap.forEach(d => { data[d.id] = d.data(); });
-        cb(data);
-      }, err => console.error('[Firestore]', err));
+
+    subscribeCandidates(cb) {
+      return onSnapshot(candidatesCol, snap => {
+        const list = [];
+        snap.forEach(d => list.push({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        cb(list);
+      }, err => console.error('[Firestore candidates]', err));
     },
-    scheduleSave(id, payload) {
+
+    subscribeScores(cb) {
+      return onSnapshot(scoresCol, snap => {
+        // Group all score docs by candidateId → interviewerId
+        const grouped = {};
+        snap.forEach(d => {
+          const data = d.data();
+          if (!grouped[data.candidateId]) grouped[data.candidateId] = {};
+          grouped[data.candidateId][data.interviewerId] = data;
+        });
+        cb(grouped);
+      }, err => console.error('[Firestore scores]', err));
+    },
+
+    async addCandidate(name) {
+      const ref = await addDoc(candidatesCol, { name: name.trim(), createdAt: Date.now() });
+      return ref.id;
+    },
+
+    scheduleSave(candidateId, interviewerId, payload) {
       this.hasPendingSave = true;
-      clearTimeout(saveTimer);
+      const key = candidateId + '_' + interviewerId;
+      clearTimeout(saveTimers[key]);
       setSyncEl('saving');
-      saveTimer = setTimeout(async () => {
+      saveTimers[key] = setTimeout(async () => {
         try {
-          await setDoc(doc(colRef, id), payload);
+          await setDoc(doc(scoresCol, key), payload);
           setSyncEl('saved');
           this.hasPendingSave = false;
         } catch(e) {
@@ -222,6 +247,21 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 .verdict-pill:not(.hi):not(.mid):not(.lo) { background: var(--line-soft); color: var(--ink-mute); }
 .empty-compare { text-align: center; padding: 4rem 2rem; color: var(--ink-mute); font-size: 14px; }
 
+/* Candidate bar */
+.cand-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.cand-chip { padding: 7px 16px; border-radius: 20px; border: 1.5px solid var(--line); background: var(--white); color: var(--ink-soft); font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; transition: all .15s; white-space: nowrap; }
+.cand-chip:hover { border-color: var(--accent); color: var(--accent); }
+.cand-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(26,58,92,.2); }
+.cand-add-btn { padding: 7px 14px; border-radius: 20px; border: 1.5px dashed var(--line); background: transparent; color: var(--ink-mute); font-size: 13px; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; transition: all .15s; display: inline-flex; align-items: center; gap: 5px; }
+.cand-add-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.cand-add-form { display: flex; align-items: center; gap: 6px; margin-left: 4px; }
+.cand-add-form.hidden { display: none; }
+.cand-add-input { padding: 6px 12px; border: 1.5px solid var(--accent); border-radius: 20px; font-size: 13px; font-family: 'IBM Plex Sans',sans-serif; color: var(--ink); background: var(--white); outline: none; width: 160px; }
+.cand-confirm-btn { padding: 6px 14px; border-radius: 20px; background: var(--accent); color: #fff; border: none; font-size: 12px; font-weight: 500; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; transition: background .15s; }
+.cand-confirm-btn:hover { background: var(--accent-mid); }
+.cand-cancel-btn { padding: 6px 10px; border-radius: 20px; background: none; border: 1px solid var(--line); color: var(--ink-mute); font-size: 12px; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; }
+.cand-empty { text-align: center; padding: 4rem 2rem; color: var(--ink-mute); font-size: 14px; }
+
 @media print { body { background: #fff; } .sync-bar, .export-btn, .name-overlay { display: none; } .qcard { break-inside: avoid; } }
 @media (max-width: 600px) { .page { padding: 1.25rem 1rem 3rem; } .header { padding: 1.5rem 1.25rem; } .header-title { font-size: 20px; } .summary-grid { grid-template-columns: 1fr 1fr; } .summary-grid .stat-card:last-child { grid-column: span 2; } .rbtn { width: 38px; height: 38px; font-size: 14px; } }
 </style>
@@ -259,10 +299,22 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
       <div id="overall-badge">尚未评分</div>
     </div>
     <div class="header-meta">
-      <div class="meta-item"><span class="meta-label">候选人</span><span class="meta-value">傅子骁 Zixiao Fu</span></div>
+      <div class="meta-item"><span class="meta-label">候选人</span><span class="meta-value" id="cand-name-display">—</span></div>
       <div class="meta-item"><span class="meta-label">年份</span><span class="meta-value" id="yr">2026</span></div>
       <div class="meta-item"><span class="meta-label">评委人数</span><span class="meta-value" id="judge-count">—</span></div>
       <div class="meta-item"><span class="meta-label">平均总分</span><span class="meta-value" id="avg-score">—</span></div>
+    </div>
+  </div>
+
+  <!-- Candidate bar -->
+  <div class="cand-bar" id="cand-bar">
+    <div id="cand-chips"></div>
+    <button class="cand-add-btn" id="cand-add-btn" onclick="showAddCandidate()">＋ 新建候选人</button>
+    <div class="cand-add-form hidden" id="cand-add-form">
+      <input class="cand-add-input" id="cand-add-input" type="text" placeholder="候选人姓名" maxlength="40"
+        onkeydown="if(event.key==='Enter')confirmAddCandidate();if(event.key==='Escape')hideAddCandidate()">
+      <button class="cand-confirm-btn" onclick="confirmAddCandidate()">确认</button>
+      <button class="cand-cancel-btn" onclick="hideAddCandidate()">取消</button>
     </div>
   </div>
 
@@ -320,12 +372,103 @@ const COLORS = ['#1a3a5c','#c0392b','#1a7a48','#b7770d','#7b2d8b','#0e6e8c'];
 let myName = '';
 let myId = '';
 let isViewOnly = false;
-let allData = {};
-let activeId = null;
+
+// Multi-candidate state
+let candidates = [];         // [{id, name, createdAt}]
+let allScores  = {};         // {candidateId: {interviewerId: scoreDoc}}
+let activeCandidateId = null;
+let allData = {};            // allScores[activeCandidateId] || {}
+
+// Interviewer tab state
+let activeId = null;         // active interviewer tab (null = compare)
 
 function nameToId(n) {
   return n.trim().replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_一-鿿]/g,'').substring(0,40) || 'user';
 }
+
+// ── Candidate management ──────────────────────────────
+
+function renderCandidateBar() {
+  const chips = document.getElementById('cand-chips');
+  if (!chips) return;
+  chips.innerHTML = candidates.map(c =>
+    `<button class="cand-chip${c.id===activeCandidateId?' active':''}" onclick="switchCandidate('${c.id}')">${c.name}</button>`
+  ).join('');
+  // Update header display
+  const nameEl = document.getElementById('cand-name-display');
+  if (nameEl) {
+    const cur = candidates.find(c => c.id === activeCandidateId);
+    nameEl.textContent = cur ? cur.name : '—';
+  }
+}
+
+function switchCandidate(id) {
+  if (activeCandidateId === id) return;
+  activeCandidateId = id;
+  allData = allScores[id] || {};
+  activeId = isViewOnly ? null : myId;
+  renderCandidateBar();
+  updateHeaderStats();
+  renderTabs();
+  renderView();
+}
+
+function showAddCandidate() {
+  document.getElementById('cand-add-btn').style.display = 'none';
+  const form = document.getElementById('cand-add-form');
+  form.classList.remove('hidden');
+  setTimeout(() => document.getElementById('cand-add-input').focus(), 60);
+}
+
+function hideAddCandidate() {
+  document.getElementById('cand-add-input').value = '';
+  document.getElementById('cand-add-form').classList.add('hidden');
+  document.getElementById('cand-add-btn').style.display = '';
+}
+
+async function confirmAddCandidate() {
+  const input = document.getElementById('cand-add-input');
+  const name = input.value.trim();
+  if (!name) { input.focus(); return; }
+  input.disabled = true;
+  try {
+    const newId = await window.__sc.addCandidate(name);
+    hideAddCandidate();
+    // Firestore snapshot will update candidates list and switch automatically
+    activeCandidateId = newId; // pre-select the new candidate
+  } catch(e) {
+    console.error('Add candidate failed', e);
+  } finally {
+    input.disabled = false;
+  }
+}
+
+function handleCandidatesUpdate(list) {
+  candidates = list;
+  // Auto-select first candidate if none active
+  if (!activeCandidateId && list.length) activeCandidateId = list[0].id;
+  // If active candidate was deleted, fall back to first
+  if (activeCandidateId && !list.find(c => c.id === activeCandidateId)) {
+    activeCandidateId = list[0]?.id || null;
+  }
+  allData = allScores[activeCandidateId] || {};
+  renderCandidateBar();
+  updateHeaderStats();
+  renderTabs();
+  renderView();
+}
+
+function handleScoresUpdate(grouped) {
+  allScores = grouped;
+  allData = grouped[activeCandidateId] || {};
+  updateHeaderStats();
+  renderTabs();
+  if (activeId === null) renderCompare();
+  else renderIndividual(activeId);
+  updSum(activeId || myId);
+}
+
+// ── Identity ──────────────────────────────────────────
 
 function initApp() {
   const stored = localStorage.getItem('sc_name_v2');
@@ -371,32 +514,20 @@ function startApp() {
   if (isViewOnly) { pill.textContent = '👁 只读'; pill.classList.add('viewer'); }
   else pill.textContent = '✏ ' + myName;
   activeId = isViewOnly ? null : myId;
-  window.__sc.subscribe(handleSnapshot);
-  renderTabs(); renderView();
+  // Subscribe to candidates and all scores
+  window.__sc.subscribeCandidates(handleCandidatesUpdate);
+  window.__sc.subscribeScores(handleScoresUpdate);
 }
 
-function handleSnapshot(data) {
-  const firstLoad = Object.keys(allData).length === 0;
-  Object.entries(data).forEach(([id, val]) => {
-    if (id === myId && window.__sc.hasPendingSave) return;
-    allData[id] = val;
-  });
-  updateHeaderStats();
-  renderTabs();
-  if (activeId === null) renderCompare();
-  else if (activeId !== myId || firstLoad) renderIndividual(activeId);
-  else updSum(activeId);
-  const upd = activeId ? allData[activeId]?.updatedAt : null;
-  if (upd) document.getElementById('last-update').textContent = '最后更新：' + new Date(upd).toLocaleString('zh-CN');
-}
+// ── Scoring ───────────────────────────────────────────
 
 function ensureMyData() {
-  if (!allData[myId]) allData[myId] = { displayName: myName, ratings: {}, notes: {}, updatedAt: 0 };
+  if (!allData[myId]) allData[myId] = { candidateId: activeCandidateId, interviewerId: myId, displayName: myName, ratings: {}, notes: {}, updatedAt: 0 };
   allData[myId].displayName = myName;
 }
 
 function setR(qid, val) {
-  if (!myId || isViewOnly) return;
+  if (!myId || isViewOnly || !activeCandidateId) return;
   ensureMyData();
   const r = allData[myId].ratings;
   if (r[qid] === val) delete r[qid]; else r[qid] = val;
@@ -404,7 +535,7 @@ function setR(qid, val) {
 }
 
 function setSlider(qid, val) {
-  if (!myId || isViewOnly) return;
+  if (!myId || isViewOnly || !activeCandidateId) return;
   ensureMyData();
   allData[myId].ratings[qid] = val;
   updBtns(qid); updSum(myId); updateHeaderStats(); scheduleSave();
@@ -418,7 +549,7 @@ function scoreColor(v) {
 }
 
 function setNote(qid, val) {
-  if (!myId || isViewOnly) return;
+  if (!myId || isViewOnly || !activeCandidateId) return;
   ensureMyData();
   if (val) allData[myId].notes[qid] = val; else delete allData[myId].notes[qid];
   scheduleSave();
@@ -426,7 +557,14 @@ function setNote(qid, val) {
 
 function scheduleSave() {
   const d = allData[myId];
-  window.__sc.scheduleSave(myId, { displayName: myName, ratings: {...d.ratings}, notes: {...d.notes}, updatedAt: Date.now() });
+  window.__sc.scheduleSave(activeCandidateId, myId, {
+    candidateId: activeCandidateId,
+    interviewerId: myId,
+    displayName: myName,
+    ratings: {...d.ratings},
+    notes: {...d.notes},
+    updatedAt: Date.now()
+  });
 }
 
 function calcW(ratings) {
@@ -524,6 +662,13 @@ function renderTabs() {
 function switchTab(id) { activeId = id; renderTabs(); renderView(); }
 
 function renderView() {
+  // No candidate yet — show prompt
+  if (!activeCandidateId) {
+    document.getElementById('individual-view').style.display = 'none';
+    document.getElementById('compare-view').style.display = 'block';
+    document.getElementById('compare-content').innerHTML = '<div class="cand-empty">还没有候选人<br><span style="font-size:12px;margin-top:6px;display:block">点击上方「＋ 新建候选人」开始评估</span></div>';
+    return;
+  }
   if (activeId === null) {
     document.getElementById('individual-view').style.display = 'none';
     document.getElementById('compare-view').style.display = 'block';
@@ -570,9 +715,11 @@ function renderCompare() {
 
 function doExport() {
   const id = activeId||myId; if (!id||!allData[id]) return;
+  const candName = candidates.find(c=>c.id===activeCandidateId)?.name || '候选人';
   const d = allData[id]; const ws = calcW(d.ratings||{}); const v = verdict(ws);
-  const lines = ['Finance Manager 面试评分报告','Amgreat North America · Operation-Finance','候选人：傅子骁 Zixiao Fu',`面试官：${d.displayName||id}`,`面试日期：${new Date().toLocaleDateString('zh-CN')}`,`加权总分：${ws??'未完成'}`,`录用建议：${v.lbl}`,'','━━━ 各题得分 ━━━',...QS.map(q=>{const r=d.ratings?.[q.id];const n=d.notes?.[q.id]||'';return `${q.id}（${Math.round(q.w*100)}%）${q.title}：${r!==undefined?r+'分':'未评'}${n?' | 备注：'+n:''}`}),'','━━━ 评分说明 ━━━','≥4.0 强烈推荐录用 | 3.0–3.9 建议考虑（评估短板）| <3.0 暂不推荐'];
-  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'})); a.download=`面试评分_傅子骁_${d.displayName||id}_${new Date().getFullYear()}.txt`; a.click();
+  const lines = ['Finance Manager 面试评分报告','Amgreat North America · Operation-Finance',`候选人：${candName}`,`面试官：${d.displayName||id}`,`面试日期：${new Date().toLocaleDateString('zh-CN')}`,`加权总分：${ws??'未完成'}`,`录用建议：${v.lbl}`,'','━━━ 各题得分 ━━━',...QS.map(q=>{const r=d.ratings?.[q.id];const n=d.notes?.[q.id]||'';return `${q.id}（${Math.round(q.w*100)}%）${q.title}：${r!==undefined?r+'分':'未评'}${n?' | 备注：'+n:''}`}),'','━━━ 评分说明 ━━━','≥4.0 强烈推荐录用 | 3.0–3.9 建议考虑（评估短板）| <3.0 暂不推荐'];
+  const safe = candName.replace(/[^\w一-鿿]/g,'_');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'})); a.download=`面试评分_${safe}_${d.displayName||id}_${new Date().getFullYear()}.txt`; a.click();
 }
 
 document.getElementById('yr').textContent = new Date().getFullYear();
