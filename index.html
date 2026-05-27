@@ -119,6 +119,23 @@
           this.hasPendingSave = false;
         }
       }, 600);
+    },
+
+    subscribeAllScores(cb) {
+      return onSnapshot(COLL, snap => {
+        const byCandidate = {};
+        snap.forEach(d => {
+          if (d.id === 'xCandidatesList') return;
+          const docData = d.data();
+          const candId = docData.candidateId;
+          const interId = docData.interviewerId;
+          if (candId && interId) {
+            if (!byCandidate[candId]) byCandidate[candId] = {};
+            byCandidate[candId][interId] = docData;
+          }
+        });
+        cb(byCandidate);
+      }, err => console.error('[Firestore allScores]', err));
     }
   };
 
@@ -310,6 +327,22 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 .cand-cancel-btn { padding: 6px 10px; border-radius: 20px; background: none; border: 1px solid var(--line); color: var(--ink-mute); font-size: 12px; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; }
 .cand-empty { text-align: center; padding: 4rem 2rem; color: var(--ink-mute); font-size: 14px; }
 
+/* Candidate compare button */
+.cand-cmp-btn { padding: 7px 16px; border-radius: 20px; border: 1.5px solid var(--accent); background: var(--white); color: var(--accent); font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'IBM Plex Sans',sans-serif; transition: all .15s; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.cand-cmp-btn:hover { background: var(--accent-soft); }
+.cand-cmp-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(26,58,92,.2); }
+
+/* Candidate compare view */
+.cand-cmp-cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.cand-cmp-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.25rem 1.5rem; flex: 1; min-width: 150px; cursor: pointer; transition: box-shadow .2s, transform .15s; position: relative; overflow: hidden; }
+.cand-cmp-card:hover { box-shadow: 0 4px 18px rgba(26,58,92,.12); transform: translateY(-2px); }
+.cand-cmp-card-tag { font-family: 'IBM Plex Mono',monospace; font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 5px; }
+.cand-cmp-card-name { font-family: 'Instrument Serif',Georgia,serif; font-size: 17px; color: var(--ink); margin-bottom: 10px; line-height: 1.3; }
+.cand-cmp-card-score { font-family: 'IBM Plex Mono',monospace; font-size: 36px; font-weight: 500; line-height: 1; margin-bottom: 8px; }
+.cand-cmp-card-footer { font-size: 11px; color: var(--ink-mute); border-top: 1px solid var(--line-soft); padding-top: 8px; margin-top: 10px; }
+.cand-cmp-best-badge { position: absolute; top: 12px; right: 12px; font-family: 'IBM Plex Mono',monospace; font-size: 9px; letter-spacing: .08em; background: var(--green-dim); color: var(--green); border: 1px solid var(--green-line); padding: 2px 8px; border-radius: 10px; }
+.ct-score.best { background: var(--green-dim); border-radius: 5px; }
+
 @media print { body { background: #fff; } .sync-bar, .export-btn, .name-overlay { display: none; } .qcard { break-inside: avoid; } }
 @media (max-width: 600px) { .page { padding: 1.25rem 1rem 3rem; } .header { padding: 1.5rem 1.25rem; } .header-title { font-size: 20px; } .summary-grid { grid-template-columns: 1fr 1fr; } .summary-grid .stat-card:last-child { grid-column: span 2; } .rbtn { width: 38px; height: 38px; font-size: 14px; } }
 </style>
@@ -364,6 +397,10 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
       <button class="cand-confirm-btn" onclick="confirmAddCandidate()">确认</button>
       <button class="cand-cancel-btn" onclick="hideAddCandidate()">取消</button>
     </div>
+    <button class="cand-cmp-btn" id="cand-cmp-btn" onclick="toggleCandCompare()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      候选人对比
+    </button>
   </div>
 
   <div class="tabs" id="tabs-row"></div>
@@ -394,6 +431,10 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 
   <div id="compare-view" style="display:none">
     <div id="compare-content"></div>
+  </div>
+
+  <div id="candidates-compare-view" style="display:none">
+    <div id="candidates-compare-content"></div>
   </div>
 </div>
 
@@ -435,6 +476,10 @@ let allData = {};            // interviewers for the active candidate
 // Interviewer tab state
 let activeId = null;         // active interviewer tab (null = compare)
 
+// Candidate compare state
+let isCandCompare = false;
+let allCandidatesData = {};  // { candidateId: { interviewerId: docData } }
+
 function nameToId(n) {
   return n.trim().replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_一-鿿]/g,'').substring(0,40) || 'user';
 }
@@ -445,7 +490,7 @@ function renderCandidateBar() {
   const chips = document.getElementById('cand-chips');
   if (!chips) return;
   chips.innerHTML = candidates.map(c =>
-    `<button class="cand-chip${c.id===activeCandidateId?' active':''}" onclick="switchCandidate('${c.id}')">
+    `<button class="cand-chip${(!isCandCompare && c.id===activeCandidateId)?' active':''}" onclick="switchCandidate('${c.id}')">
       ${c.name}
       <span class="cand-rename-btn" onclick="event.stopPropagation();renameCandidate('${c.id}','${c.name.replace(/'/g,"\\'")}')">✏</span>
     </button>`
@@ -475,7 +520,10 @@ async function renameCandidate(id, currentName) {
 }
 
 function switchCandidate(id) {
-  if (activeCandidateId === id) return;
+  if (activeCandidateId === id && !isCandCompare) return;
+  isCandCompare = false;
+  const cmpBtn = document.getElementById('cand-cmp-btn');
+  if (cmpBtn) cmpBtn.classList.remove('active');
   activeCandidateId = id;
   allData = {};
   activeId = isViewOnly ? null : myId;
@@ -616,6 +664,11 @@ function startApp() {
   activeId = isViewOnly ? null : myId;
   // Subscribe to candidates list; score subscription is started inside handleCandidatesUpdate
   window.__sc.subscribeCandidates(handleCandidatesUpdate);
+  // Subscribe to all scores for candidate comparison view
+  window.__sc.subscribeAllScores(data => {
+    allCandidatesData = data;
+    if (isCandCompare) renderCandidatesCompare();
+  });
 }
 
 // ── Scoring ───────────────────────────────────────────
@@ -760,7 +813,154 @@ function renderTabs() {
 
 function switchTab(id) { activeId = id; renderTabs(); renderView(); }
 
+// ── Candidate Compare ─────────────────────────────────
+
+function toggleCandCompare() {
+  isCandCompare = !isCandCompare;
+  const btn = document.getElementById('cand-cmp-btn');
+  if (btn) btn.classList.toggle('active', isCandCompare);
+  renderCandidateBar();
+  renderView();
+}
+
+function exitCompareGoTo(id) {
+  isCandCompare = false;
+  switchCandidate(id);
+}
+
+function renderCandidatesCompare() {
+  const el = document.getElementById('candidates-compare-content');
+  if (!el) return;
+  if (!candidates.length) {
+    el.innerHTML = '<div class="cand-empty">还没有候选人<br><span style="font-size:12px;margin-top:6px;display:block">点击「＋ 新建候选人」开始评估</span></div>';
+    return;
+  }
+
+  // Build per-candidate score summary
+  const candScores = candidates.map((c, i) => {
+    const interviewers = allCandidatesData[c.id] || {};
+    const iids = Object.keys(interviewers);
+    // Average each question across all interviewers
+    const qScores = {};
+    QS.forEach(q => {
+      const vals = iids.map(id => interviewers[id]?.ratings?.[q.id]).filter(s => s !== undefined);
+      if (vals.length) qScores[q.id] = vals.reduce((a,b)=>a+b,0)/vals.length;
+    });
+    const ws = calcW(qScores);
+    const v = verdict(ws);
+    const evaluators = iids.map(id => interviewers[id]?.displayName||id).join('、') || '暂无评分';
+    const cnt = Object.keys(qScores).length;
+    const color = COLORS[i % COLORS.length];
+    return { ...c, qScores, ws, v, evaluators, cnt, color };
+  });
+
+  // Find highest overall score for "最高分" badge
+  const wsScores = candScores.map(c => c.ws !== null ? parseFloat(c.ws) : -1);
+  const maxWs = Math.max(...wsScores);
+
+  function vsStyle(cls) {
+    if (cls==='hi') return 'background:#ebfaf3;color:#1a7a48;border:1px solid #a3dcbc';
+    if (cls==='mid') return 'background:#fdf6e7;color:#b7770d;border:1px solid #f0d896';
+    if (cls==='lo') return 'background:#fdf1f0;color:#c0392b;border:1px solid #f4c0bb';
+    return 'background:#f0f2f6;color:#9aa1b0;border:1px solid #e0e3ea';
+  }
+
+  // Summary cards
+  const cards = candScores.map((c, i) => {
+    const isBestOverall = c.ws !== null && parseFloat(c.ws) === maxWs && wsScores.filter(s=>s===maxWs).length===1;
+    const scoreColor = c.ws === null ? 'var(--ink-mute)' : parseFloat(c.ws)>=4 ? 'var(--green)' : parseFloat(c.ws)>=3 ? 'var(--amber)' : 'var(--red)';
+    return `<div class="cand-cmp-card" style="border-top:3px solid ${c.color}" onclick="exitCompareGoTo('${c.id}')">
+      ${isBestOverall ? '<span class="cand-cmp-best-badge">综合最高</span>' : ''}
+      <div class="cand-cmp-card-tag">候选人 ${String.fromCharCode(65+i)}</div>
+      <div class="cand-cmp-card-name">${c.name}</div>
+      <div class="cand-cmp-card-score" style="color:${scoreColor}">${c.ws ?? '—'}</div>
+      <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;${vsStyle(c.v.cls)}">${c.v.lbl}</span>
+      <div class="cand-cmp-card-footer">${c.cnt}/${TOTAL_Q} 题已评 &nbsp;·&nbsp; 评委：${c.evaluators}<br><span style="font-size:10px;color:var(--accent);margin-top:3px;display:inline-block">点击查看详情 →</span></div>
+    </div>`;
+  }).join('');
+
+  // Per-question best score detection
+  const qBest = {};
+  QS.forEach(q => {
+    const vals = candScores.map(c => c.qScores[q.id]).filter(s => s !== undefined);
+    if (vals.length > 1) qBest[q.id] = Math.max(...vals);
+  });
+
+  // Comparison table
+  const headCols = candScores.map(c => `<th style="color:${c.color}">${c.name}</th>`).join('');
+
+  let lastMod = null;
+  const bodyRows = QS.map(q => {
+    const modRow = q.mod !== lastMod
+      ? `<tr><td colspan="${2+candScores.length}" style="padding:14px 12px 4px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);background:var(--bg);border-bottom:1px solid var(--line-soft);">${q.mod} &nbsp;·&nbsp; ${q.mw}</td></tr>`
+      : '';
+    lastMod = q.mod;
+
+    const scoreCols = candScores.map(c => {
+      const s = c.qScores[q.id];
+      const isBest = s !== undefined && qBest[q.id] !== undefined && s === qBest[q.id];
+      const cls = s === undefined ? 'none' : s >= 4 ? 'hi' : s >= 2.5 ? 'mid' : 'lo';
+      const disp = s !== undefined ? (Number.isInteger(s) ? s : s.toFixed(1)) : '—';
+      return `<td class="ct-score ${cls}${isBest?' best':''}">${isBest?'▲ ':''}${disp}</td>`;
+    }).join('');
+
+    return modRow + `<tr>
+      <td class="ct-qlabel"><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--ink-mute);margin-right:5px;">${q.id}</span>${q.title}</td>
+      <td class="ct-weight">${Math.round(q.w*100)}%</td>
+      ${scoreCols}
+    </tr>`;
+  }).join('');
+
+  const totalCols = candScores.map(c => {
+    const cls = c.ws === null ? 'none' : parseFloat(c.ws)>=4 ? 'hi' : parseFloat(c.ws)>=3 ? 'mid' : 'lo';
+    return `<td class="ct-score ${cls}" style="font-size:16px">${c.ws ?? '—'}</td>`;
+  }).join('');
+
+  const verdictCols = candScores.map(c =>
+    `<td><span class="verdict-pill ${c.v.cls}">${c.v.lbl}</span></td>`
+  ).join('');
+
+  el.innerHTML = `
+    <div class="cand-cmp-cards">${cards}</div>
+    <div class="compare-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-bottom:1rem;border-bottom:1px solid var(--line-soft);margin-bottom:.5rem;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);">各题得分横向对比</div>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+          ${candScores.map(c=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-mid);"><span style="width:10px;height:10px;border-radius:3px;background:${c.color};display:inline-block;"></span>${c.name}</span>`).join('')}
+          <span style="font-size:11px;color:var(--ink-mute);padding-left:8px;border-left:1px solid var(--line);">▲ 该题最高分</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="compare-table">
+          <thead><tr>
+            <th class="ct-qlabel">题目</th>
+            <th class="ct-weight">权重</th>
+            ${headCols}
+          </tr></thead>
+          <tbody>${bodyRows}</tbody>
+          <tfoot>
+            <tr><td colspan="2" style="font-size:13px;">加权总分</td>${totalCols}</tr>
+            <tr><td colspan="2" style="font-size:13px;">录用建议</td>${verdictCols}</tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+}
+
 function renderView() {
+  const ccv = document.getElementById('candidates-compare-view');
+  // ── Candidate compare mode ──
+  if (isCandCompare) {
+    document.getElementById('individual-view').style.display = 'none';
+    document.getElementById('compare-view').style.display = 'none';
+    document.getElementById('tabs-row').style.display = 'none';
+    if (ccv) ccv.style.display = 'block';
+    renderCandidatesCompare();
+    return;
+  }
+  if (ccv) ccv.style.display = 'none';
+  document.getElementById('tabs-row').style.display = '';
+  // ── Normal modes ──
   if (!activeCandidateId) {
     // No candidates yet — show prompt
     document.getElementById('individual-view').style.display = 'none';
