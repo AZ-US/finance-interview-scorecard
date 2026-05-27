@@ -489,12 +489,22 @@ function nameToId(n) {
 function renderCandidateBar() {
   const chips = document.getElementById('cand-chips');
   if (!chips) return;
-  chips.innerHTML = candidates.map(c =>
-    `<button class="cand-chip${(!isCandCompare && c.id===activeCandidateId)?' active':''}" onclick="switchCandidate('${c.id}')">
-      ${c.name}
-      <span class="cand-rename-btn" onclick="event.stopPropagation();renameCandidate('${c.id}','${c.name.replace(/'/g,"\\'")}')">✏</span>
-    </button>`
-  ).join('');
+  chips.innerHTML = candidates.map(c => {
+    // Derive verdict color from this candidate's scores in allCandidatesData
+    const cInterviewers = allCandidatesData[c.id] || {};
+    const cIids = Object.keys(cInterviewers);
+    const cQScores = {};
+    QS.forEach(q => {
+      const vals = cIids.map(id => cInterviewers[id]?.ratings?.[q.id]).filter(s => s !== undefined);
+      if (vals.length) cQScores[q.id] = vals.reduce((a,b)=>a+b,0)/vals.length;
+    });
+    const cWs = calcW(cQScores);
+    const vc = verdictColor(cWs);
+    const isActive = !isCandCompare && c.id === activeCandidateId;
+    // dot is always verdict-colored (white outline when chip is active)
+    const dot = `<span style="width:8px;height:8px;border-radius:50%;background:${isActive?'#fff':vc.main};flex-shrink:0;display:inline-block;box-shadow:${isActive?'0 0 0 1.5px rgba(255,255,255,.5)':'none'};"></span>`;
+    return `<button class="cand-chip${isActive?' active':''}" onclick="switchCandidate('${c.id}')">${dot}${c.name}<span class="cand-rename-btn" onclick="event.stopPropagation();renameCandidate('${c.id}','${c.name.replace(/'/g,"\\'")}')">✏</span></button>`;
+  }).join('');
   // Update header display
   const nameEl = document.getElementById('cand-name-display');
   if (nameEl) {
@@ -667,6 +677,7 @@ function startApp() {
   // Subscribe to all scores for candidate comparison view
   window.__sc.subscribeAllScores(data => {
     allCandidatesData = data;
+    renderCandidateBar();          // refresh verdict dots on candidate chips
     if (isCandCompare) renderCandidatesCompare();
   });
 }
@@ -731,6 +742,15 @@ function verdict(sc) {
   if (s >= 4.0) return { lbl:'强烈推荐录用', cls:'hi' };
   if (s >= 3.0) return { lbl:'建议考虑（评估短板）', cls:'mid' };
   return { lbl:'暂不推荐', cls:'lo' };
+}
+
+// Verdict-based color palette used for candidate coloring
+function verdictColor(ws) {
+  if (ws === null || ws === undefined) return { main:'#9aa1b0', dim:'#f0f2f6', line:'#e0e3ea', css:'var(--ink-mute)' };
+  const s = parseFloat(ws);
+  if (s >= 4.0) return { main:'#1a7a48', dim:'#ebfaf3', line:'#a3dcbc', css:'var(--green)' };
+  if (s >= 3.0) return { main:'#b7770d', dim:'#fdf6e7', line:'#f0d896', css:'var(--amber)' };
+  return { main:'#c0392b', dim:'#fdf1f0', line:'#f4c0bb', css:'var(--red)' };
 }
 
 function updateHeaderStats() {
@@ -850,8 +870,8 @@ function renderCandidatesCompare() {
     const v = verdict(ws);
     const evaluators = iids.map(id => interviewers[id]?.displayName||id).join('、') || '暂无评分';
     const cnt = Object.keys(qScores).length;
-    const color = COLORS[i % COLORS.length];
-    return { ...c, qScores, ws, v, evaluators, cnt, color };
+    const vc = verdictColor(ws);
+    return { ...c, qScores, ws, v, evaluators, cnt, color: vc.main, colorDim: vc.dim, colorLine: vc.line };
   });
 
   // Find highest overall score for "最高分" badge
@@ -868,14 +888,13 @@ function renderCandidatesCompare() {
   // Summary cards
   const cards = candScores.map((c, i) => {
     const isBestOverall = c.ws !== null && parseFloat(c.ws) === maxWs && wsScores.filter(s=>s===maxWs).length===1;
-    const scoreColor = c.ws === null ? 'var(--ink-mute)' : parseFloat(c.ws)>=4 ? 'var(--green)' : parseFloat(c.ws)>=3 ? 'var(--amber)' : 'var(--red)';
-    return `<div class="cand-cmp-card" style="border-top:3px solid ${c.color}" onclick="exitCompareGoTo('${c.id}')">
+    return `<div class="cand-cmp-card" style="border:1px solid ${c.colorLine};border-top:3px solid ${c.color};background:${c.colorDim};" onclick="exitCompareGoTo('${c.id}')">
       ${isBestOverall ? '<span class="cand-cmp-best-badge">综合最高</span>' : ''}
-      <div class="cand-cmp-card-tag">候选人 ${String.fromCharCode(65+i)}</div>
-      <div class="cand-cmp-card-name">${c.name}</div>
-      <div class="cand-cmp-card-score" style="color:${scoreColor}">${c.ws ?? '—'}</div>
+      <div class="cand-cmp-card-tag" style="color:${c.color};opacity:.8;">候选人 ${String.fromCharCode(65+i)}</div>
+      <div class="cand-cmp-card-name" style="color:var(--ink);">${c.name}</div>
+      <div class="cand-cmp-card-score" style="color:${c.color}">${c.ws ?? '—'}</div>
       <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;${vsStyle(c.v.cls)}">${c.v.lbl}</span>
-      <div class="cand-cmp-card-footer">${c.cnt}/${TOTAL_Q} 题已评 &nbsp;·&nbsp; 评委：${c.evaluators}<br><span style="font-size:10px;color:var(--accent);margin-top:3px;display:inline-block">点击查看详情 →</span></div>
+      <div class="cand-cmp-card-footer" style="border-top:1px solid ${c.colorLine};">${c.cnt}/${TOTAL_Q} 题已评 &nbsp;·&nbsp; 评委：${c.evaluators}<br><span style="font-size:10px;color:${c.color};margin-top:3px;display:inline-block">点击查看详情 →</span></div>
     </div>`;
   }).join('');
 
