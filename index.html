@@ -812,9 +812,116 @@ function doExport() {
   const id = activeId||myId; if (!id||!allData[id]) return;
   const candName = candidates.find(c=>c.id===activeCandidateId)?.name || '候选人';
   const d = allData[id]; const ws = calcW(d.ratings||{}); const v = verdict(ws);
-  const lines = ['Finance Manager 面试评分报告','Amgreat North America · Operation-Finance',`候选人：${candName}`,`面试官：${d.displayName||id}`,`面试日期：${new Date().toLocaleDateString('zh-CN')}`,`加权总分：${ws??'未完成'}`,`录用建议：${v.lbl}`,'','━━━ 各题得分 ━━━',...QS.map(q=>{const r=d.ratings?.[q.id];const n=d.notes?.[q.id]||'';return `${q.id}（${Math.round(q.w*100)}%）${q.title}：${r!==undefined?r+'分':'未评'}${n?' | 备注：'+n:''}`}),'','━━━ 评分说明 ━━━','≥4.0 强烈推荐录用 | 3.0–3.9 建议考虑（评估短板）| <3.0 暂不推荐'];
-  const safe = candName.replace(/[^\w一-鿿]/g,'_');
-  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'})); a.download=`面试评分_${safe}_${d.displayName||id}_${new Date().getFullYear()}.txt`; a.click();
+  const dateStr = new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric'});
+
+  function scLabel(sc) {
+    if (sc===undefined) return {txt:'未评',bg:'#f0f2f6',col:'#9aa1b0',bdr:'#e0e3ea'};
+    if (sc>=4) return {txt:sc+' 优秀',bg:'#ebfaf3',col:'#1a7a48',bdr:'#a3dcbc'};
+    if (sc>=2.5) return {txt:sc+' 达标',bg:'#fdf6e7',col:'#b7770d',bdr:'#f0d896'};
+    return {txt:sc+' 不足',bg:'#fdf1f0',col:'#c0392b',bdr:'#f4c0bb'};
+  }
+  function vStyle(vc) {
+    if (vc==='hi') return {bg:'#ebfaf3',col:'#1a7a48',bdr:'#a3dcbc'};
+    if (vc==='mid') return {bg:'#fdf6e7',col:'#b7770d',bdr:'#f0d896'};
+    if (vc==='lo') return {bg:'#fdf1f0',col:'#c0392b',bdr:'#f4c0bb'};
+    return {bg:'rgba(255,255,255,.12)',col:'rgba(255,255,255,.65)',bdr:'rgba(255,255,255,.15)'};
+  }
+  const vs = vStyle(v.cls);
+
+  // Overview grid
+  const gridHTML = QS.map(q=>{
+    const sc=d.ratings?.[q.id]; const sl=scLabel(sc);
+    return `<div style="background:#f7f8fb;border-radius:8px;border:1px solid #f0f2f6;padding:.75rem 1rem;">
+      <div style="font-family:monospace;font-size:9px;color:#9aa1b0;margin-bottom:3px;">${q.id} &nbsp;·&nbsp; ${Math.round(q.w*100)}%</div>
+      <div style="font-size:12px;color:#3d4350;margin-bottom:7px;line-height:1.35;">${q.title}</div>
+      <span style="font-family:monospace;font-size:13px;font-weight:600;padding:3px 10px;border-radius:6px;background:${sl.bg};color:${sl.col};border:1px solid ${sl.bdr};">${sc??'—'}</span>
+    </div>`;
+  }).join('');
+
+  // Question cards
+  let lastMod=null, cardsHTML='';
+  QS.forEach(q=>{
+    if (q.mod!==lastMod) {
+      cardsHTML+=`<div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9aa1b0;margin:2rem 0 .75rem;display:flex;align-items:center;gap:10px;">${q.mod} &nbsp;·&nbsp; ${q.mw} <span style="flex:1;height:1px;background:#f0f2f6;display:inline-block;"></span></div>`;
+      lastMod=q.mod;
+    }
+    const sc=d.ratings?.[q.id]; const note=d.notes?.[q.id]||''; const sl=scLabel(sc);
+    let rubHTML='';
+    if (sc!==undefined) {
+      let rt,rb,rc,rbd;
+      if (sc===1){rt=`1分 — ${q.r1}`;rb='#fdf1f0';rc='#8b1a10';rbd='#f4c0bb';}
+      else if (sc===3){rt=`3分 — ${q.r3}`;rb='#fdf6e7';rc='#7a5200';rbd='#f0d896';}
+      else if (sc===5){rt=`5分 — ${q.r5}`;rb='#ebfaf3';rc='#0f5c34';rbd='#a3dcbc';}
+      else if (sc<3){rt=`${sc}分 — 介于「不足」(1) 与「达标」(3) 之间`;rb='#fdf6e7';rc='#7a5200';rbd='#f0d896';}
+      else {rt=`${sc}分 — 介于「达标」(3) 与「优秀」(5) 之间`;rb='#ebfaf3';rc='#0f5c34';rbd='#a3dcbc';}
+      rubHTML=`<div style="font-size:12px;line-height:1.65;padding:8px 12px;border-radius:7px;margin-top:10px;background:${rb};border:1px solid ${rbd};color:${rc};">${rt}</div>`;
+    }
+    const noteHTML=note?`<div style="margin-top:8px;font-size:12.5px;color:#3d4350;background:#f7f8fb;border:1px solid #e0e3ea;border-radius:7px;padding:9px 12px;white-space:pre-wrap;line-height:1.65;">${note.replace(/</g,'&lt;')}</div>`:'';
+    cardsHTML+=`<div style="background:#fff;border:1px solid #e0e3ea;border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:10px;break-inside:avoid;page-break-inside:avoid;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9aa1b0;margin-bottom:3px;">${q.id} &nbsp;·&nbsp; ${q.mod.split('·')[0].trim()}</div>
+          <div style="font-family:'Instrument Serif',Georgia,serif;font-size:16px;color:#111318;line-height:1.3;margin-bottom:5px;">${q.title}</div>
+          <div style="font-size:12px;color:#6b7384;line-height:1.7;">${q.full}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
+          <span style="font-family:monospace;font-size:11px;background:#f0f2f6;color:#6b7384;padding:3px 10px;border-radius:20px;border:1px solid #e0e3ea;">${Math.round(q.w*100)}%</span>
+          <span style="font-family:monospace;font-size:15px;font-weight:600;padding:5px 14px;border-radius:8px;background:${sl.bg};color:${sl.col};border:1px solid ${sl.bdr};">${sl.txt}</span>
+        </div>
+      </div>
+      ${rubHTML}${noteHTML}
+    </div>`;
+  });
+
+  const rcnt=Object.keys(d.ratings||{}).length;
+  const pct=Math.round(rcnt/TOTAL_Q*100);
+
+  const html=`<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>面试评分报告 · ${candName}</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif;background:#f7f8fb;color:#111318;font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:2.5rem 1.75rem 5rem}
+@media print{body{background:#fff}@page{margin:1.2cm 1.5cm}.no-print{display:none}}
+</style></head>
+<body><div class="wrap">
+
+<div style="background:#1a3a5c;border-radius:12px;padding:2rem 2.25rem 1.75rem;margin-bottom:1.75rem;overflow:hidden;">
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:6px;">Amgreat North America · Operation-Finance</div>
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;">
+    <div>
+      <div style="font-family:'Instrument Serif',Georgia,serif;font-size:26px;color:#fff;line-height:1.2;letter-spacing:-.01em;">Finance Manager<br><em style="color:rgba(255,255,255,.65);">面试评分报告</em></div>
+      <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:4px;">评分规则：5 优秀 · 3 达标 · 1 不足</div>
+    </div>
+    <span style="padding:7px 18px;border-radius:20px;font-size:13px;font-weight:500;background:${vs.bg};color:${vs.col};border:1px solid ${vs.bdr};align-self:flex-start;">${v.lbl}</span>
+  </div>
+  <div style="display:flex;gap:2.5rem;padding-top:1.25rem;border-top:1px solid rgba(255,255,255,.12);flex-wrap:wrap;">
+    ${[['候选人',candName],['面试官',d.displayName||id],['面试日期',dateStr],['加权总分',(ws??'未完成')+' / 5.00'],['完成进度',pct+'%  ('+rcnt+'/'+TOTAL_Q+' 题)']].map(([l,val])=>`<div><div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:3px;">${l}</div><div style="font-size:13px;color:rgba(255,255,255,.85);font-weight:500;">${val}</div></div>`).join('')}
+  </div>
+</div>
+
+<div style="background:#fff;border:1px solid #e0e3ea;border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.75rem;">
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9aa1b0;margin-bottom:1rem;">各题得分总览</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px;">${gridHTML}</div>
+</div>
+
+${cardsHTML}
+
+<div style="margin-top:2rem;padding-top:1rem;border-top:1px solid #e0e3ea;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa1b0;">
+  <span>Amgreat North America · Finance Manager 面试评分系统</span>
+  <span>导出时间：${new Date().toLocaleString('zh-CN')}</span>
+</div>
+
+</div></body></html>`;
+
+  const safe=candName.replace(/[^\w一-鿿]/g,'_');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
+  a.download=`面试评分报告_${safe}_${d.displayName||id}_${new Date().getFullYear()}.html`;
+  a.click();
 }
 
 document.getElementById('yr').textContent = new Date().getFullYear();
