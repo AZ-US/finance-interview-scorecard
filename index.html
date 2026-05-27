@@ -378,10 +378,16 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
       </div>
       <div class="progress-header"><span>完成进度</span><span id="pct">0%</span></div>
       <div class="progress-track"><div class="progress-fill" id="pbar" style="width:0%"></div></div>
-      <button class="export-btn" onclick="doExport()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        导出评分报告
-      </button>
+      <div style="display:flex;gap:10px;margin-top:1.25rem;flex-wrap:wrap;">
+        <button class="export-btn" style="margin-top:0" onclick="doExport()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导出评分报告
+        </button>
+        <button class="export-btn" style="margin-top:0;background:var(--white);color:var(--accent);border:1.5px solid var(--accent);" onmouseover="this.style.background='var(--accent-soft)'" onmouseout="this.style.background='var(--white)'" onclick="doPrint()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          打印 / 存为 PDF
+        </button>
+      </div>
       <div class="last-update" id="last-update"></div>
     </div>
   </div>
@@ -808,8 +814,7 @@ function renderCompare() {
   el.innerHTML=`<div class="compare-card"><div class="compare-legend">${legend}</div><div style="overflow-x:auto"><table class="compare-table"><thead><tr><th class="ct-qlabel">题目</th><th class="ct-weight">权重</th>${headCols}<th>平均</th></tr></thead><tbody>${bodyRows}</tbody><tfoot><tr><td colspan="2">加权总分</td>${totalCols}<td></td></tr><tr><td colspan="2">录用建议</td>${verdictCols}<td></td></tr></tfoot></table></div></div>`;
 }
 
-function doExport() {
-  const id = activeId||myId; if (!id||!allData[id]) return;
+function buildReportHTML(id) {
   const candName = candidates.find(c=>c.id===activeCandidateId)?.name || '候选人';
   const d = allData[id]; const ws = calcW(d.ratings||{}); const v = verdict(ws);
   const dateStr = new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric'});
@@ -917,11 +922,26 @@ ${cardsHTML}
 
 </div></body></html>`;
 
-  const safe=candName.replace(/[^\w一-鿿]/g,'_');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
-  a.download=`面试评分报告_${safe}_${d.displayName||id}_${new Date().getFullYear()}.html`;
+  return { html, candName, displayName: d.displayName||id };
+}
+
+function doExport() {
+  const id = activeId||myId; if (!id||!allData[id]) return;
+  const { html, candName, displayName } = buildReportHTML(id);
+  const safe = candName.replace(/[^\w一-鿿]/g,'_');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
+  a.download = `面试评分报告_${safe}_${displayName}_${new Date().getFullYear()}.html`;
   a.click();
+}
+
+function doPrint() {
+  const id = activeId||myId; if (!id||!allData[id]) return;
+  const { html } = buildReportHTML(id);
+  const win = window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  win.addEventListener('load', () => { win.focus(); win.print(); });
 }
 
 document.getElementById('yr').textContent = new Date().getFullYear();
