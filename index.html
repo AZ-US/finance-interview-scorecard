@@ -549,6 +549,11 @@ function handleScoresUpdate(data) {
     if (id === myId && window.__sc.hasPendingSave) return;
     allData[id] = val;
   });
+  // In view-only mode: auto-open the first interviewer's full question view
+  // instead of landing on the empty compare table
+  if (isViewOnly && activeId === null && Object.keys(allData).length > 0) {
+    activeId = Object.keys(allData)[0];
+  }
   // Remove stale entries not in remote (e.g., nobody deleted yet — skip for now)
   updateHeaderStats();
   renderTabs();
