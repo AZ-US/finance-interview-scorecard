@@ -10,7 +10,6 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, doc, getDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyB2ft9H5rdZvMKU8P62COYjyNlp_Tglfts",
@@ -24,7 +23,6 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const auth = getAuth(app);
-  const storage = getStorage(app);
 
   // Stay ENTIRELY within the original known-working collection:
   //   scorecard/finance_manager_2026/interviewers/{docId}
@@ -121,18 +119,6 @@
           this.hasPendingSave = false;
         }
       }, 600);
-    },
-
-    uploadResume(candidateId, file, onProgress) {
-      const sRef = storageRef(storage, `resumes/${candidateId}.pdf`);
-      return new Promise((resolve, reject) => {
-        const task = uploadBytesResumable(sRef, file, { contentType: 'application/pdf' });
-        task.on('state_changed',
-          s => { if (onProgress) onProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)); },
-          reject,
-          async () => { try { resolve(await getDownloadURL(task.snapshot.ref)); } catch(e) { reject(e); } }
-        );
-      });
     },
 
     async updateCandidateResume(id, resumeUrl) {
@@ -472,8 +458,8 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
           查看简历
         </button>
         <button id="resume-upload-btn" class="export-btn" style="margin-top:0;background:var(--white);color:var(--ink-soft);border:1.5px dashed var(--line);display:none;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='var(--white)'" onclick="triggerResumeUpload(activeId||myId)">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          上传简历
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          添加简历链接
         </button>
       </div>
       <div class="last-update" id="last-update"></div>
@@ -556,8 +542,8 @@ function renderCandidateBar() {
     const dot = `<span style="width:8px;height:8px;border-radius:50%;background:${isActive?'#fff':vc.main};flex-shrink:0;display:inline-block;box-shadow:${isActive?'0 0 0 1.5px rgba(255,255,255,.5)':'none'};"></span>`;
     const hasResume = !!c.resumeUrl;
     const resumeBtn = hasResume
-      ? `<span class="chip-resume-btn has-resume" onclick="event.stopPropagation();openResume('${c.id}')" title="查看简历">📄</span>`
-      : `<span class="chip-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')" title="上传简历（PDF）">📎</span>`;
+      ? `<span class="chip-resume-btn has-resume" onclick="event.stopPropagation();openResume('${c.id}')" title="查看简历（点击更换链接可右键）">📄</span>`
+      : `<span class="chip-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')" title="添加简历链接">📎</span>`;
     return `<button class="cand-chip${isActive?' active':''}" onclick="switchCandidate('${c.id}')">${dot}${c.name}${resumeBtn}<span class="cand-rename-btn" onclick="event.stopPropagation();renameCandidate('${c.id}','${c.name.replace(/'/g,"\\'")}')">✏</span></button>`;
   }).join('');
   // Update header display
@@ -890,59 +876,61 @@ function switchTab(id) { activeId = id; renderTabs(); renderView(); }
 
 // ── Candidate Compare ─────────────────────────────────
 
-// ── Resume upload & preview ───────────────────────────
+// ── Resume link & preview ────────────────────────────
 
-let pendingUploadCandId = null;
-
-function triggerResumeUpload(candidateId) {
-  pendingUploadCandId = candidateId;
-  const inp = document.getElementById('resume-file-input');
-  inp.value = '';
-  inp.click();
+// Convert any Google Drive share link to an embeddable preview URL
+function toEmbedUrl(raw) {
+  // https://drive.google.com/file/d/FILE_ID/view?... → /preview
+  const m = raw.match(/drive\.google\.com\/file\/d\/([^\/\?&]+)/);
+  if (m) return `https://drive.google.com/file/d/${m[1]}/preview`;
+  // Already a /preview link — return as-is
+  return raw;
 }
 
-async function handleResumeUpload(input) {
-  const file = input.files[0];
-  if (!file || !pendingUploadCandId) return;
-  const id = pendingUploadCandId;
-  pendingUploadCandId = null;
-  const cand = candidates.find(c => c.id === id);
+let linkModalCandId = null;
 
-  // Open modal in "uploading" state
-  const modal = document.getElementById('resume-modal');
-  const bar   = document.getElementById('resume-progress-bar');
-  const title = document.getElementById('resume-modal-title');
-  const iframe = document.getElementById('resume-iframe');
-  title.textContent = '上传中… ' + (cand?.name || '');
-  bar.style.width = '0%';
-  iframe.src = 'about:blank';
-  modal.style.display = 'flex';
+function triggerResumeUpload(candidateId) {
+  // Renamed entry point — now opens a link-entry dialog instead of file picker
+  linkModalCandId = candidateId;
+  const cand = candidates.find(c => c.id === candidateId);
+  const existing = cand?.resumeUrl || '';
+  const inp = document.getElementById('link-modal-input');
+  inp.value = existing;
+  document.getElementById('link-modal-cand-name').textContent = cand?.name || '候选人';
+  document.getElementById('link-modal').style.display = 'flex';
+  setTimeout(() => inp.focus(), 80);
+}
 
+async function confirmResumeLink() {
+  const raw = document.getElementById('link-modal-input').value.trim();
+  closeLinkModal();
+  if (!linkModalCandId) return;
+  const id = linkModalCandId;
+  linkModalCandId = null;
+  const url = raw ? toEmbedUrl(raw) : '';
   try {
-    const url = await window.__sc.uploadResume(id, file, pct => {
-      bar.style.width = pct + '%';
-    });
     await window.__sc.updateCandidateResume(id, url);
-    // Show PDF
-    title.textContent = (cand?.name || '候选人') + ' · 简历';
-    document.getElementById('resume-download-link').href = url;
-    bar.style.width = '100%';
-    iframe.src = url;
   } catch(e) {
-    console.error('[Resume upload]', e);
-    modal.style.display = 'none';
-    alert('上传失败：' + (e.message || '请检查网络或 Firebase Storage 权限'));
+    alert('保存失败：' + (e.message || '请检查网络'));
   }
+}
+
+function closeLinkModal() {
+  document.getElementById('link-modal').style.display = 'none';
 }
 
 function openResume(candidateId) {
   const cand = candidates.find(c => c.id === candidateId);
   if (!cand?.resumeUrl) return;
+  const embedUrl = cand.resumeUrl; // already converted to embed URL when saved
+  // For download link: convert /preview back to /view for Google Drive
+  const downloadUrl = embedUrl.replace(/\/preview(\?.*)?$/, '/view');
   const modal = document.getElementById('resume-modal');
   document.getElementById('resume-modal-title').textContent = (cand.name || '候选人') + ' · 简历';
-  document.getElementById('resume-download-link').href = cand.resumeUrl;
+  document.getElementById('resume-download-link').href = downloadUrl;
+  document.getElementById('resume-download-link').target = '_blank';
   document.getElementById('resume-progress-bar').style.width = '100%';
-  document.getElementById('resume-iframe').src = cand.resumeUrl;
+  document.getElementById('resume-iframe').src = embedUrl;
   modal.style.display = 'flex';
 }
 
@@ -1019,7 +1007,7 @@ function renderCandidatesCompare() {
           <span style="font-size:10px;color:${c.color};cursor:pointer;" onclick="exitCompareGoTo('${c.id}')">查看详情 →</span>
           ${c.resumeUrl
             ? `<button class="cand-cmp-resume-btn has-resume" onclick="event.stopPropagation();openResume('${c.id}')">📄 查看简历</button>`
-            : `<button class="cand-cmp-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')">📎 上传简历</button>`
+            : `<button class="cand-cmp-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')">📎 添加简历链接</button>`
           }
         </div>
       </div>
@@ -1302,8 +1290,27 @@ document.getElementById('yr').textContent = new Date().getFullYear();
 window.addEventListener('firestore-ready', initApp);
 </script>
 
-<!-- Hidden file input for resume upload -->
-<input type="file" id="resume-file-input" accept=".pdf,application/pdf" style="display:none" onchange="handleResumeUpload(this)">
+<!-- Link entry modal for resume -->
+<div id="link-modal" style="display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;background:rgba(15,20,35,.6);backdrop-filter:blur(4px);" onclick="if(event.target===this)closeLinkModal()">
+  <div style="background:#fff;border-radius:14px;padding:2rem;width:min(480px,94vw);box-shadow:0 32px 80px rgba(0,0,0,.3);">
+    <div style="font-family:'Instrument Serif',Georgia,serif;font-size:19px;color:var(--ink);margin-bottom:4px;">添加简历链接</div>
+    <div id="link-modal-cand-name" style="font-size:12px;color:var(--ink-mute);font-family:'IBM Plex Mono',monospace;margin-bottom:1.25rem;"></div>
+    <input id="link-modal-input" type="url" placeholder="https://drive.google.com/file/d/…/view"
+      style="width:100%;padding:10px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:13.5px;font-family:'IBM Plex Sans',sans-serif;color:var(--ink);background:var(--bg);outline:none;margin-bottom:10px;transition:border-color .15s;"
+      onfocus="this.style.borderColor='var(--accent)';this.style.background='#fff'"
+      onblur="this.style.borderColor='var(--line)';this.style.background='var(--bg)'"
+      onkeydown="if(event.key==='Enter')confirmResumeLink();if(event.key==='Escape')closeLinkModal()">
+    <div style="background:var(--accent-soft);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--accent);line-height:1.7;margin-bottom:1.25rem;">
+      <strong>Google Drive 步骤：</strong><br>
+      1. 右键 PDF → 共享 → 「知道链接的任何人可查看」<br>
+      2. 复制链接，粘贴到上方即可
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="closeLinkModal()" style="padding:8px 18px;border:1.5px solid var(--line);border-radius:8px;background:none;color:var(--ink-soft);font-size:13px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;">取消</button>
+      <button onclick="confirmResumeLink()" style="padding:8px 22px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:13px;font-weight:500;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;">确认添加</button>
+    </div>
+  </div>
+</div>
 
 <!-- Resume PDF preview modal -->
 <div id="resume-modal" class="resume-modal" style="display:none" onclick="if(event.target===this)closeResumeModal()">
