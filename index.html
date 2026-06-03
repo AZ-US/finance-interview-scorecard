@@ -1232,9 +1232,16 @@ function buildReportHTML(id) {
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif;background:#f7f8fb;color:#111318;font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
 .wrap{max-width:860px;margin:0 auto;padding:2.5rem 1.75rem 5rem}
+.print-fab{position:fixed;bottom:28px;right:28px;display:flex;align-items:center;gap:8px;padding:11px 22px;background:#1a3a5c;color:#fff;border:none;border-radius:50px;font-size:14px;font-weight:500;font-family:'IBM Plex Sans',sans-serif;cursor:pointer;box-shadow:0 4px 20px rgba(26,58,92,.35);transition:background .15s;}
+.print-fab:hover{background:#2d5a8e;}
 @media print{body{background:#fff}@page{margin:1.2cm 1.5cm}.no-print{display:none}}
 </style></head>
-<body><div class="wrap">
+<body>
+<button class="print-fab no-print" onclick="window.print()">
+  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+  打印 / 存为 PDF
+</button>
+<div class="wrap">
 
 <div style="background:#1a3a5c;border-radius:12px;padding:2rem 2.25rem 1.75rem;margin-bottom:1.75rem;overflow:hidden;">
   <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:6px;">Amgreat North America · Operation-Finance</div>
