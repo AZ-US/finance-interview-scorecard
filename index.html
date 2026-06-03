@@ -10,6 +10,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, doc, getDoc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyB2ft9H5rdZvMKU8P62COYjyNlp_Tglfts",
@@ -23,6 +24,7 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const auth = getAuth(app);
+  const storage = getStorage(app);
 
   // Stay ENTIRELY within the original known-working collection:
   //   scorecard/finance_manager_2026/interviewers/{docId}
@@ -119,6 +121,25 @@
           this.hasPendingSave = false;
         }
       }, 600);
+    },
+
+    uploadResume(candidateId, file, onProgress) {
+      const sRef = storageRef(storage, `resumes/${candidateId}.pdf`);
+      return new Promise((resolve, reject) => {
+        const task = uploadBytesResumable(sRef, file, { contentType: 'application/pdf' });
+        task.on('state_changed',
+          s => { if (onProgress) onProgress(Math.round(s.bytesTransferred / s.totalBytes * 100)); },
+          reject,
+          async () => { try { resolve(await getDownloadURL(task.snapshot.ref)); } catch(e) { reject(e); } }
+        );
+      });
+    },
+
+    async updateCandidateResume(id, resumeUrl) {
+      const snap = await getDoc(CAND_DOC);
+      const list = snap.exists() ? (snap.data().list || []) : [];
+      const updated = list.map(c => c.id === id ? { ...c, resumeUrl } : c);
+      await setDoc(CAND_DOC, { list: updated });
     },
 
     subscribeAllScores(cb) {
@@ -343,7 +364,29 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 .cand-cmp-best-badge { position: absolute; top: 12px; right: 12px; font-family: 'IBM Plex Mono',monospace; font-size: 9px; letter-spacing: .08em; background: var(--green-dim); color: var(--green); border: 1px solid var(--green-line); padding: 2px 8px; border-radius: 10px; }
 .ct-score.best { background: var(--green-dim); border-radius: 5px; }
 
-@media print { body { background: #fff; } .sync-bar, .export-btn, .name-overlay { display: none; } .qcard { break-inside: avoid; } }
+/* Resume chip button */
+.chip-resume-btn { font-size:12px; padding:0 2px; background:none; border:none; cursor:pointer; opacity:.4; transition:opacity .15s; line-height:1; flex-shrink:0; }
+.cand-chip:hover .chip-resume-btn { opacity:.7; }
+.chip-resume-btn.has-resume { opacity:1; color:var(--accent); }
+.chip-resume-btn.has-resume:hover { color:var(--green); opacity:1; }
+/* Resume upload progress bar (inside chip) */
+.resume-uploading { animation: resumePulse .8s ease-in-out infinite; }
+@keyframes resumePulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+/* Resume modal */
+.resume-modal { position:fixed; inset:0; z-index:400; display:flex; align-items:center; justify-content:center; background:rgba(15,20,35,.65); backdrop-filter:blur(4px); }
+.resume-modal-panel { width:min(900px,96vw); height:90vh; background:#fff; border-radius:var(--radius); display:flex; flex-direction:column; box-shadow:0 40px 100px rgba(0,0,0,.35); overflow:hidden; }
+.resume-modal-header { display:flex; align-items:center; justify-content:space-between; padding:.85rem 1.25rem; background:var(--accent); color:#fff; flex-shrink:0; gap:12px; }
+.resume-modal-title { font-family:'Instrument Serif',Georgia,serif; font-size:16px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.resume-modal-actions { display:flex; gap:8px; align-items:center; flex-shrink:0; }
+.resume-modal-act-btn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:rgba(255,255,255,.85); font-size:12px; font-family:'IBM Plex Sans',sans-serif; padding:4px 12px; border-radius:6px; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:5px; transition:background .15s; }
+.resume-modal-act-btn:hover { background:rgba(255,255,255,.22); color:#fff; }
+.resume-progress-bar { height:3px; background:var(--green); width:0%; transition:width .25s; flex-shrink:0; }
+.resume-embed { flex:1; border:none; background:#f0f2f6; }
+/* Resume button in candidate compare cards */
+.cand-cmp-resume-btn { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; border:1.5px solid var(--line); background:var(--white); color:var(--ink-soft); font-size:12px; font-family:'IBM Plex Sans',sans-serif; cursor:pointer; transition:all .15s; margin-top:6px; }
+.cand-cmp-resume-btn:hover { border-color:var(--accent); color:var(--accent); }
+.cand-cmp-resume-btn.has-resume { border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+@media print { body { background: #fff; } .sync-bar, .export-btn, .name-overlay, .resume-modal { display: none; } .qcard { break-inside: avoid; } }
 @media (max-width: 600px) { .page { padding: 1.25rem 1rem 3rem; } .header { padding: 1.5rem 1.25rem; } .header-title { font-size: 20px; } .summary-grid { grid-template-columns: 1fr 1fr; } .summary-grid .stat-card:last-child { grid-column: span 2; } .rbtn { width: 38px; height: 38px; font-size: 14px; } }
 </style>
 </head>
@@ -415,7 +458,7 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
       </div>
       <div class="progress-header"><span>完成进度</span><span id="pct">0%</span></div>
       <div class="progress-track"><div class="progress-fill" id="pbar" style="width:0%"></div></div>
-      <div style="display:flex;gap:10px;margin-top:1.25rem;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;margin-top:1.25rem;flex-wrap:wrap;" id="action-btns">
         <button class="export-btn" style="margin-top:0" onclick="doExport()">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           导出评分报告
@@ -423,6 +466,14 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
         <button class="export-btn" style="margin-top:0;background:var(--white);color:var(--accent);border:1.5px solid var(--accent);" onmouseover="this.style.background='var(--accent-soft)'" onmouseout="this.style.background='var(--white)'" onclick="doPrint()">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           打印 / 存为 PDF
+        </button>
+        <button id="resume-view-btn" class="export-btn" style="margin-top:0;background:var(--white);color:var(--green);border:1.5px solid var(--green-line);display:none;" onmouseover="this.style.background='var(--green-dim)'" onmouseout="this.style.background='var(--white)'" onclick="openResume(activeId||myId)">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          查看简历
+        </button>
+        <button id="resume-upload-btn" class="export-btn" style="margin-top:0;background:var(--white);color:var(--ink-soft);border:1.5px dashed var(--line);display:none;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='var(--white)'" onclick="triggerResumeUpload(activeId||myId)">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          上传简历
         </button>
       </div>
       <div class="last-update" id="last-update"></div>
@@ -503,7 +554,11 @@ function renderCandidateBar() {
     const isActive = !isCandCompare && c.id === activeCandidateId;
     // dot is always verdict-colored (white outline when chip is active)
     const dot = `<span style="width:8px;height:8px;border-radius:50%;background:${isActive?'#fff':vc.main};flex-shrink:0;display:inline-block;box-shadow:${isActive?'0 0 0 1.5px rgba(255,255,255,.5)':'none'};"></span>`;
-    return `<button class="cand-chip${isActive?' active':''}" onclick="switchCandidate('${c.id}')">${dot}${c.name}<span class="cand-rename-btn" onclick="event.stopPropagation();renameCandidate('${c.id}','${c.name.replace(/'/g,"\\'")}')">✏</span></button>`;
+    const hasResume = !!c.resumeUrl;
+    const resumeBtn = hasResume
+      ? `<span class="chip-resume-btn has-resume" onclick="event.stopPropagation();openResume('${c.id}')" title="查看简历">📄</span>`
+      : `<span class="chip-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')" title="上传简历（PDF）">📎</span>`;
+    return `<button class="cand-chip${isActive?' active':''}" onclick="switchCandidate('${c.id}')">${dot}${c.name}${resumeBtn}<span class="cand-rename-btn" onclick="event.stopPropagation();renameCandidate('${c.id}','${c.name.replace(/'/g,"\\'")}')">✏</span></button>`;
   }).join('');
   // Update header display
   const nameEl = document.getElementById('cand-name-display');
@@ -835,6 +890,70 @@ function switchTab(id) { activeId = id; renderTabs(); renderView(); }
 
 // ── Candidate Compare ─────────────────────────────────
 
+// ── Resume upload & preview ───────────────────────────
+
+let pendingUploadCandId = null;
+
+function triggerResumeUpload(candidateId) {
+  pendingUploadCandId = candidateId;
+  const inp = document.getElementById('resume-file-input');
+  inp.value = '';
+  inp.click();
+}
+
+async function handleResumeUpload(input) {
+  const file = input.files[0];
+  if (!file || !pendingUploadCandId) return;
+  const id = pendingUploadCandId;
+  pendingUploadCandId = null;
+  const cand = candidates.find(c => c.id === id);
+
+  // Open modal in "uploading" state
+  const modal = document.getElementById('resume-modal');
+  const bar   = document.getElementById('resume-progress-bar');
+  const title = document.getElementById('resume-modal-title');
+  const iframe = document.getElementById('resume-iframe');
+  title.textContent = '上传中… ' + (cand?.name || '');
+  bar.style.width = '0%';
+  iframe.src = 'about:blank';
+  modal.style.display = 'flex';
+
+  try {
+    const url = await window.__sc.uploadResume(id, file, pct => {
+      bar.style.width = pct + '%';
+    });
+    await window.__sc.updateCandidateResume(id, url);
+    // Show PDF
+    title.textContent = (cand?.name || '候选人') + ' · 简历';
+    document.getElementById('resume-download-link').href = url;
+    bar.style.width = '100%';
+    iframe.src = url;
+  } catch(e) {
+    console.error('[Resume upload]', e);
+    modal.style.display = 'none';
+    alert('上传失败：' + (e.message || '请检查网络或 Firebase Storage 权限'));
+  }
+}
+
+function openResume(candidateId) {
+  const cand = candidates.find(c => c.id === candidateId);
+  if (!cand?.resumeUrl) return;
+  const modal = document.getElementById('resume-modal');
+  document.getElementById('resume-modal-title').textContent = (cand.name || '候选人') + ' · 简历';
+  document.getElementById('resume-download-link').href = cand.resumeUrl;
+  document.getElementById('resume-progress-bar').style.width = '100%';
+  document.getElementById('resume-iframe').src = cand.resumeUrl;
+  modal.style.display = 'flex';
+}
+
+function closeResumeModal() {
+  document.getElementById('resume-modal').style.display = 'none';
+  document.getElementById('resume-iframe').src = 'about:blank';
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeResumeModal(); });
+
 function toggleCandCompare() {
   isCandCompare = !isCandCompare;
   const btn = document.getElementById('cand-cmp-btn');
@@ -894,7 +1013,16 @@ function renderCandidatesCompare() {
       <div class="cand-cmp-card-name" style="color:var(--ink);">${c.name}</div>
       <div class="cand-cmp-card-score" style="color:${c.color}">${c.ws ?? '—'}</div>
       <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;${vsStyle(c.v.cls)}">${c.v.lbl}</span>
-      <div class="cand-cmp-card-footer" style="border-top:1px solid ${c.colorLine};">${c.cnt}/${TOTAL_Q} 题已评 &nbsp;·&nbsp; 评委：${c.evaluators}<br><span style="font-size:10px;color:${c.color};margin-top:3px;display:inline-block">点击查看详情 →</span></div>
+      <div class="cand-cmp-card-footer" style="border-top:1px solid ${c.colorLine};">
+        ${c.cnt}/${TOTAL_Q} 题已评 &nbsp;·&nbsp; 评委：${c.evaluators}<br>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+          <span style="font-size:10px;color:${c.color};cursor:pointer;" onclick="exitCompareGoTo('${c.id}')">查看详情 →</span>
+          ${c.resumeUrl
+            ? `<button class="cand-cmp-resume-btn has-resume" onclick="event.stopPropagation();openResume('${c.id}')">📄 查看简历</button>`
+            : `<button class="cand-cmp-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')">📎 上传简历</button>`
+          }
+        </div>
+      </div>
     </div>`;
   }).join('');
 
@@ -1004,6 +1132,13 @@ function renderIndividual(id) {
   const isMe = id===myId && !isViewOnly;
   const d = allData[id]||{ratings:{},notes:{}};
   const ratings = d.ratings||{}; const notes = d.notes||{};
+  // Update resume buttons in the summary area
+  const cand = candidates.find(c => c.id === activeCandidateId);
+  const hasRes = !!cand?.resumeUrl;
+  const viewBtn = document.getElementById('resume-view-btn');
+  const upBtn = document.getElementById('resume-upload-btn');
+  if (viewBtn) viewBtn.style.display = hasRes ? '' : 'none';
+  if (upBtn) upBtn.style.display = hasRes ? 'none' : '';
   const list = document.getElementById('qlist'); list.innerHTML = ''; let lastMod = null;
   QS.forEach(q => {
     if (q.mod !== lastMod) { const sl=document.createElement('div'); sl.className='section-label'; sl.textContent=q.mod+' · 权重 '+q.mw; list.appendChild(sl); lastMod=q.mod; }
@@ -1166,5 +1301,26 @@ function doPrint() {
 document.getElementById('yr').textContent = new Date().getFullYear();
 window.addEventListener('firestore-ready', initApp);
 </script>
+
+<!-- Hidden file input for resume upload -->
+<input type="file" id="resume-file-input" accept=".pdf,application/pdf" style="display:none" onchange="handleResumeUpload(this)">
+
+<!-- Resume PDF preview modal -->
+<div id="resume-modal" class="resume-modal" style="display:none" onclick="if(event.target===this)closeResumeModal()">
+  <div class="resume-modal-panel">
+    <div class="resume-modal-header">
+      <span id="resume-modal-title" class="resume-modal-title">候选人简历</span>
+      <div class="resume-modal-actions">
+        <a id="resume-download-link" href="#" download class="resume-modal-act-btn" target="_blank">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          下载
+        </a>
+        <button class="resume-modal-act-btn" onclick="closeResumeModal()">✕ 关闭</button>
+      </div>
+    </div>
+    <div id="resume-progress-bar" class="resume-progress-bar"></div>
+    <iframe id="resume-iframe" class="resume-embed" src="about:blank"></iframe>
+  </div>
+</div>
 </body>
 </html>
