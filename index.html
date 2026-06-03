@@ -919,19 +919,26 @@ function closeLinkModal() {
   document.getElementById('link-modal').style.display = 'none';
 }
 
+let currentResumeCandId = null;
+
 function openResume(candidateId) {
   const cand = candidates.find(c => c.id === candidateId);
   if (!cand?.resumeUrl) return;
-  const embedUrl = cand.resumeUrl; // already converted to embed URL when saved
-  // For download link: convert /preview back to /view for Google Drive
+  currentResumeCandId = candidateId;
+  const embedUrl = cand.resumeUrl;
   const downloadUrl = embedUrl.replace(/\/preview(\?.*)?$/, '/view');
-  const modal = document.getElementById('resume-modal');
   document.getElementById('resume-modal-title').textContent = (cand.name || '候选人') + ' · 简历';
   document.getElementById('resume-download-link').href = downloadUrl;
   document.getElementById('resume-download-link').target = '_blank';
   document.getElementById('resume-progress-bar').style.width = '100%';
   document.getElementById('resume-iframe').src = embedUrl;
-  modal.style.display = 'flex';
+  document.getElementById('resume-modal').style.display = 'flex';
+}
+
+function changeResumeLink() {
+  const id = currentResumeCandId;
+  closeResumeModal();
+  if (id) triggerResumeUpload(id);
 }
 
 function closeResumeModal() {
@@ -1337,9 +1344,13 @@ window.addEventListener('firestore-ready', initApp);
     <div class="resume-modal-header">
       <span id="resume-modal-title" class="resume-modal-title">候选人简历</span>
       <div class="resume-modal-actions">
+        <button class="resume-modal-act-btn" onclick="changeResumeLink()" title="替换简历链接">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          更换链接
+        </button>
         <a id="resume-download-link" href="#" download class="resume-modal-act-btn" target="_blank">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          下载
+          在新窗口打开
         </a>
         <button class="resume-modal-act-btn" onclick="closeResumeModal()">✕ 关闭</button>
       </div>
