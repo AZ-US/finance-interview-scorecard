@@ -1287,10 +1287,22 @@ function doExport() {
 function doPrint() {
   const id = activeId||myId; if (!id||!allData[id]) return;
   const { html } = buildReportHTML(id);
-  const win = window.open('','_blank');
-  win.document.write(html);
-  win.document.close();
-  win.addEventListener('load', () => { win.focus(); win.print(); });
+  // Use Blob URL so the load event fires reliably
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
+  const win = window.open(blobUrl, '_blank');
+  if (!win) {
+    URL.revokeObjectURL(blobUrl);
+    alert('浏览器阻止了弹出窗口。\n\n请点击地址栏右侧的弹出拦截提示，选择「允许」后重试。');
+    return;
+  }
+  win.addEventListener('load', () => {
+    setTimeout(() => {
+      win.focus();
+      win.print();
+      URL.revokeObjectURL(blobUrl);
+    }, 400);
+  });
 }
 
 document.getElementById('yr').textContent = new Date().getFullYear();
