@@ -1063,6 +1063,14 @@ function renderCandidatesCompare() {
   ).join('');
 
   el.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:.85rem;">
+      <button class="export-btn" style="margin-top:0;background:var(--white);color:var(--accent);border:1.5px solid var(--accent);"
+        onmouseover="this.style.background='var(--accent-soft)'" onmouseout="this.style.background='var(--white)'"
+        onclick="printCandidatesCompare()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        打印对比报告
+      </button>
+    </div>
     <div class="cand-cmp-cards">${cards}</div>
     <div class="compare-card">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-bottom:1rem;border-bottom:1px solid var(--line-soft);margin-bottom:.5rem;">
@@ -1087,6 +1095,159 @@ function renderCandidatesCompare() {
         </table>
       </div>
     </div>`;
+}
+
+function printCandidatesCompare() {
+  if (!candidates.length) return;
+
+  // Recompute candScores (same logic as renderCandidatesCompare)
+  const candScores = candidates.map((c, i) => {
+    const interviewers = allCandidatesData[c.id] || {};
+    const iids = Object.keys(interviewers);
+    const qScores = {};
+    QS.forEach(q => {
+      const vals = iids.map(id => interviewers[id]?.ratings?.[q.id]).filter(s => s !== undefined);
+      if (vals.length) qScores[q.id] = vals.reduce((a,b)=>a+b,0)/vals.length;
+    });
+    const ws = calcW(qScores);
+    const v = verdict(ws);
+    const vc = verdictColor(ws);
+    const evaluators = iids.map(id => interviewers[id]?.displayName||id).join('、') || '暂无评分';
+    return { ...c, qScores, ws, v, evaluators, cnt: Object.keys(qScores).length,
+             color: vc.main, colorDim: vc.dim, colorLine: vc.line };
+  });
+
+  const wsScores = candScores.map(c => c.ws !== null ? parseFloat(c.ws) : -1);
+  const maxWs = Math.max(...wsScores);
+  const dateStr = new Date().toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric'});
+
+  function vs(cls) {
+    if (cls==='hi')  return 'background:#ebfaf3;color:#1a7a48;border:1px solid #a3dcbc';
+    if (cls==='mid') return 'background:#fdf6e7;color:#b7770d;border:1px solid #f0d896';
+    if (cls==='lo')  return 'background:#fdf1f0;color:#c0392b;border:1px solid #f4c0bb';
+    return 'background:#f0f2f6;color:#9aa1b0;border:1px solid #e0e3ea';
+  }
+  function sc(s) { return s===undefined?'#9aa1b0':s>=4?'#1a7a48':s>=2.5?'#b7770d':'#c0392b'; }
+
+  // Summary cards
+  const summaryCards = candScores.map((c,i) => {
+    const isBest = c.ws!==null && parseFloat(c.ws)===maxWs && wsScores.filter(x=>x===maxWs).length===1;
+    return `<div style="flex:1;min-width:130px;background:${c.colorDim};border:1px solid ${c.colorLine};border-top:3px solid ${c.color};border-radius:10px;padding:.9rem 1.1rem;position:relative;">
+      ${isBest?`<span style="position:absolute;top:9px;right:9px;font-size:9px;padding:2px 7px;border-radius:8px;font-family:monospace;background:#ebfaf3;color:#1a7a48;border:1px solid #a3dcbc;">综合最高</span>`:''}
+      <div style="font-size:9px;font-family:monospace;letter-spacing:.08em;color:${c.color};opacity:.8;margin-bottom:3px;">候选人 ${String.fromCharCode(65+i)}</div>
+      <div style="font-size:14px;font-weight:600;color:#111318;margin-bottom:8px;">${c.name}</div>
+      <div style="font-size:28px;font-family:monospace;font-weight:500;color:${c.color};line-height:1;margin-bottom:7px;">${c.ws??'—'}</div>
+      <span style="font-size:11px;padding:2px 9px;border-radius:12px;display:inline-block;${vs(c.v.cls)}">${c.v.lbl}</span>
+      <div style="font-size:10px;color:#9aa1b0;margin-top:8px;padding-top:6px;border-top:1px solid ${c.colorLine};">${c.cnt}/${TOTAL_Q} 题 · ${c.evaluators}</div>
+    </div>`;
+  }).join('');
+
+  // Per-question best
+  const qBest = {};
+  QS.forEach(q => {
+    const vals = candScores.map(c => c.qScores[q.id]).filter(s => s !== undefined);
+    if (vals.length > 1) qBest[q.id] = Math.max(...vals);
+  });
+
+  const headCols = candScores.map(c =>
+    `<th style="color:${c.color};padding:8px 10px;font-size:12px;font-weight:600;border-bottom:2px solid #e0e3ea;text-align:center;">${c.name}</th>`
+  ).join('');
+
+  let lastMod = null;
+  const bodyRows = QS.map(q => {
+    let modRow = '';
+    if (q.mod !== lastMod) {
+      modRow = `<tr><td colspan="${2+candScores.length}" style="padding:11px 10px 3px;font-size:9px;font-family:monospace;letter-spacing:.1em;text-transform:uppercase;color:#9aa1b0;background:#f7f8fb;border-bottom:1px solid #f0f2f6;">${q.mod} · ${q.mw}</td></tr>`;
+      lastMod = q.mod;
+    }
+    const scoreCols = candScores.map(c => {
+      const s = c.qScores[q.id];
+      const isBest = s!==undefined && qBest[q.id]!==undefined && s===qBest[q.id];
+      const disp = s!==undefined ? (Number.isInteger(s)?s:s.toFixed(1)) : '—';
+      return `<td style="${isBest?'background:#ebfaf3;':''}text-align:center;padding:7px 10px;border-bottom:1px solid #f0f2f6;font-family:monospace;font-size:14px;font-weight:500;color:${sc(s)};">${isBest?'▲ ':''}${disp}</td>`;
+    }).join('');
+    return modRow + `<tr>
+      <td style="padding:7px 10px;border-bottom:1px solid #f0f2f6;font-size:12.5px;color:#111318;"><span style="font-size:9px;color:#9aa1b0;font-family:monospace;margin-right:4px;">Q${q.num}</span>${q.title}</td>
+      <td style="text-align:center;padding:7px 10px;border-bottom:1px solid #f0f2f6;font-size:11px;font-family:monospace;color:#9aa1b0;">${Math.round(q.w*100)}%</td>
+      ${scoreCols}
+    </tr>`;
+  }).join('');
+
+  const totalCols = candScores.map(c =>
+    `<td style="text-align:center;padding:10px;border-top:2px solid #e0e3ea;font-family:monospace;font-size:16px;font-weight:600;color:${sc(c.ws!==null?parseFloat(c.ws):undefined)};">${c.ws??'—'}</td>`
+  ).join('');
+
+  const verdictCols = candScores.map(c =>
+    `<td style="text-align:center;padding:8px 10px;"><span style="display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:500;${vs(c.v.cls)}">${c.v.lbl}</span></td>`
+  ).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>候选人对比报告 · Finance Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif;background:#f7f8fb;color:#111318;font-size:13px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:980px;margin:0 auto;padding:1.75rem 1.5rem 4rem}
+.fab{position:fixed;bottom:24px;right:24px;display:flex;align-items:center;gap:8px;padding:10px 20px;background:#1a3a5c;color:#fff;border:none;border-radius:50px;font-size:13px;font-weight:500;font-family:'IBM Plex Sans',sans-serif;cursor:pointer;box-shadow:0 4px 20px rgba(26,58,92,.3);transition:background .15s;}
+.fab:hover{background:#2d5a8e;}
+@media print{body{background:#fff}.fab{display:none}@page{size:A4 landscape;margin:1.2cm 1.5cm}}
+</style></head>
+<body>
+<button class="fab" onclick="window.print()">
+  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+  打印 / 存为 PDF
+</button>
+<div class="wrap">
+
+<div style="background:#1a3a5c;border-radius:12px;padding:1.6rem 2rem;margin-bottom:1.25rem;">
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:5px;">Amgreat North America · Operation-Finance</div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+    <div style="font-family:'Instrument Serif',Georgia,serif;font-size:22px;color:#fff;line-height:1.25;">Finance Manager<br><em style="color:rgba(255,255,255,.65);">候选人综合对比报告</em></div>
+    <div style="display:flex;gap:2rem;flex-wrap:wrap;">
+      ${[['候选人数',candScores.length+' 人'],['生成日期',dateStr],['评分规则','5 优秀 · 3 达标 · 1 不足']].map(([l,v])=>
+        `<div><div style="font-size:9px;font-family:monospace;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:2px;">${l}</div><div style="font-size:12px;color:rgba(255,255,255,.8);font-weight:500;">${v}</div></div>`
+      ).join('')}
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:1.25rem;">${summaryCards}</div>
+
+<div style="background:#fff;border:1px solid #e0e3ea;border-radius:12px;padding:1.1rem 1.25rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:.75rem;padding-bottom:.6rem;border-bottom:1px solid #f0f2f6;">
+    <span style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9aa1b0;">各题得分横向对比</span>
+    <span style="font-size:10.5px;color:#9aa1b0;">▲ 该题最高分 &nbsp;|&nbsp; 🟢 ≥4 优秀 &nbsp;🟡 ≥2.5 达标 &nbsp;🔴 不足</span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr>
+        <th style="text-align:left;padding:7px 10px;font-size:10px;font-family:monospace;letter-spacing:.08em;text-transform:uppercase;font-weight:500;border-bottom:2px solid #e0e3ea;color:#6b7384;">题目</th>
+        <th style="text-align:center;padding:7px 10px;font-size:10px;font-family:monospace;letter-spacing:.08em;text-transform:uppercase;font-weight:500;border-bottom:2px solid #e0e3ea;color:#6b7384;">权重</th>
+        ${headCols}
+      </tr></thead>
+      <tbody>${bodyRows}</tbody>
+      <tfoot>
+        <tr><td colspan="2" style="padding:10px;font-size:13px;font-weight:600;border-top:2px solid #e0e3ea;">加权总分</td>${totalCols}</tr>
+        <tr><td colspan="2" style="padding:8px 10px;font-size:13px;font-weight:600;">录用建议</td>${verdictCols}</tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<div style="margin-top:1.25rem;padding-top:.75rem;border-top:1px solid #e0e3ea;display:flex;justify-content:space-between;font-family:monospace;font-size:10px;color:#9aa1b0;flex-wrap:wrap;gap:8px;">
+  <span>Amgreat North America · Finance Manager 面试评分系统</span>
+  <span>生成时间：${new Date().toLocaleString('zh-CN')}</span>
+</div>
+</div></body></html>`;
+
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const blobUrl = URL.createObjectURL(blob);
+  const win = window.open(blobUrl, '_blank');
+  if (!win) { URL.revokeObjectURL(blobUrl); alert('弹出窗口被拦截，请允许后重试'); return; }
+  win.addEventListener('load', () => {
+    setTimeout(() => { win.print(); URL.revokeObjectURL(blobUrl); }, 400);
+  });
 }
 
 function renderView() {
