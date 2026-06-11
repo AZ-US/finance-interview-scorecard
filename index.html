@@ -460,11 +460,11 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           <span data-i18n="printBtn">打印 / 存为 PDF</span>
         </button>
-        <button id="resume-view-btn" class="export-btn" style="margin-top:0;background:var(--white);color:var(--green);border:1.5px solid var(--green-line);display:none;" onmouseover="this.style.background='var(--green-dim)'" onmouseout="this.style.background='var(--white)'" onclick="openResume(activeId||myId)">
+        <button id="resume-view-btn" class="export-btn" style="margin-top:0;background:var(--white);color:var(--green);border:1.5px solid var(--green-line);display:none;" onmouseover="this.style.background='var(--green-dim)'" onmouseout="this.style.background='var(--white)'" onclick="openResume(activeCandidateId)">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           <span data-i18n="viewResume">查看简历</span>
         </button>
-        <button id="resume-upload-btn" class="export-btn" style="margin-top:0;background:var(--white);color:var(--ink-soft);border:1.5px dashed var(--line);display:none;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='var(--white)'" onclick="triggerResumeUpload(activeId||myId)">
+        <button id="resume-upload-btn" class="export-btn" style="margin-top:0;background:var(--white);color:var(--ink-soft);border:1.5px dashed var(--line);display:none;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='var(--white)'" onclick="triggerResumeUpload(activeCandidateId)">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           <span data-i18n="addResumeLink">添加简历链接</span>
         </button>
