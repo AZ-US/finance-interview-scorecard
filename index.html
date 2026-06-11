@@ -880,7 +880,8 @@ function startApp() {
 // ── Scoring ───────────────────────────────────────────
 
 function ensureMyData() {
-  if (!allData[myId]) allData[myId] = { candidateId: activeCandidateId, interviewerId: myId, displayName: myName, ratings: {}, notes: {}, updatedAt: 0 };
+  if (!allData[myId]) allData[myId] = { candidateId: activeCandidateId, interviewerId: myId, displayName: myName, ratings: {}, notes: {}, notesEn: {}, updatedAt: 0 };
+  if (!allData[myId].notesEn) allData[myId].notesEn = {};
   allData[myId].displayName = myName;
 }
 
@@ -909,7 +910,9 @@ function scoreColor(v) {
 function setNote(qid, val) {
   if (!myId || isViewOnly || !activeCandidateId) return;
   ensureMyData();
-  if (val) allData[myId].notes[qid] = val; else delete allData[myId].notes[qid];
+  // EN mode edits the English note; ZH mode edits the Chinese note
+  const map = lang === 'en' ? allData[myId].notesEn : allData[myId].notes;
+  if (val) map[qid] = val; else delete map[qid];
   scheduleSave();
 }
 
@@ -921,6 +924,7 @@ function scheduleSave() {
     displayName: myName,
     ratings: {...d.ratings},
     notes: {...d.notes},
+    notesEn: {...(d.notesEn||{})},
     updatedAt: Date.now()
   });
 }
@@ -1437,7 +1441,9 @@ function renderView() {
 function renderIndividual(id) {
   const isMe = id===myId && !isViewOnly;
   const d = allData[id]||{ratings:{},notes:{}};
-  const ratings = d.ratings||{}; const notes = d.notes||{};
+  const ratings = d.ratings||{};
+  // EN mode shows English notes (falls back to Chinese where no translation exists)
+  const notes = lang === 'en' ? {...(d.notes||{}), ...(d.notesEn||{})} : (d.notes||{});
   // Update resume buttons in the summary area
   const cand = candidates.find(c => c.id === activeCandidateId);
   const hasRes = !!cand?.resumeUrl;
@@ -1510,7 +1516,7 @@ function buildReportHTML(id) {
       cardsHTML+=`<div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9aa1b0;margin:2rem 0 .75rem;display:flex;align-items:center;gap:10px;">${qf(q,'mod')} &nbsp;·&nbsp; ${q.mw} <span style="flex:1;height:1px;background:#f0f2f6;display:inline-block;"></span></div>`;
       lastMod=q.mod;
     }
-    const sc=d.ratings?.[q.id]; const note=d.notes?.[q.id]||''; const sl=scLabel(sc);
+    const sc=d.ratings?.[q.id]; const note=(lang==='en' ? (d.notesEn?.[q.id] ?? d.notes?.[q.id]) : d.notes?.[q.id])||''; const sl=scLabel(sc);
     let rubHTML='';
     if (sc!==undefined) {
       let rt=rubricText(q,sc),rb,rc,rbd;
