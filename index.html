@@ -43,9 +43,10 @@
   function setSyncEl(s) {
     const el = document.getElementById('sync-status');
     if (!el) return;
-    if (s === 'saving') { el.textContent = '同步中…'; el.className = 'sync-status saving'; }
-    else if (s === 'saved') { el.textContent = '已同步 ✓'; el.className = 'sync-status saved'; }
-    else { el.textContent = '同步失败'; el.className = 'sync-status error'; }
+    const tx = window.__t || (k => ({syncSaving:'同步中…',syncSaved:'已同步 ✓',syncError:'同步失败'}[k]));
+    if (s === 'saving') { el.textContent = tx('syncSaving'); el.className = 'sync-status saving'; }
+    else if (s === 'saved') { el.textContent = tx('syncSaved'); el.className = 'sync-status saved'; }
+    else { el.textContent = tx('syncError'); el.className = 'sync-status error'; }
   }
 
   function genId() {
@@ -189,6 +190,9 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 .user-pill:hover { background: rgba(255,255,255,.28); }
 .user-pill.viewer { background: rgba(255,255,255,.1); color: rgba(255,255,255,.5); cursor: default; }
 .sync-status { font-size: 11px; }
+.sync-bar-right { display: flex; align-items: center; gap: 10px; }
+.lang-btn { padding: 3px 12px; border-radius: 10px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,.18); color: #fff; border: none; cursor: pointer; font-family: 'IBM Plex Mono',monospace; letter-spacing: .05em; transition: background .15s; }
+.lang-btn:hover { background: rgba(255,255,255,.32); }
 .sync-status.saving { color: rgba(255,220,100,.9); }
 .sync-status.saved  { color: rgba(100,220,140,.9); }
 .sync-status.error  { color: rgba(255,120,100,.9); }
@@ -381,21 +385,24 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 <div id="name-overlay" class="name-overlay" style="display:none">
   <div class="name-box">
     <div class="name-icon">📋</div>
-    <h2>Finance Manager 面试评分表</h2>
+    <h2 data-i18n="nameBoxTitle">Finance Manager 面试评分表</h2>
     <p>Amgreat North America · Operation-Finance</p>
-    <input id="name-input" type="text" placeholder="请输入你的姓名" maxlength="30"
+    <input id="name-input" type="text" data-i18n-ph="namePlaceholder" placeholder="请输入你的姓名" maxlength="30"
       onkeydown="if(event.key==='Enter')confirmName()">
-    <button class="name-btn" onclick="confirmName()">开始评分</button>
-    <button class="name-btn-ghost" onclick="viewOnly()">仅查看，不评分</button>
+    <button class="name-btn" onclick="confirmName()" data-i18n="startBtn">开始评分</button>
+    <button class="name-btn-ghost" onclick="viewOnly()" data-i18n="viewOnlyBtn">仅查看，不评分</button>
   </div>
 </div>
 
 <div class="sync-bar">
   <div class="sync-bar-left">
     <span id="user-pill" class="user-pill" onclick="changeName()" title="点击修改姓名">…</span>
-    <span>Finance Manager 面试评分表 · Amgreat North America</span>
+    <span data-i18n="appTitle">Finance Manager 面试评分表 · Amgreat North America</span>
   </div>
-  <span id="sync-status" class="sync-status"></span>
+  <div class="sync-bar-right">
+    <span id="sync-status" class="sync-status"></span>
+    <button id="lang-btn" class="lang-btn" onclick="toggleLang()" title="切换语言 / Switch language">EN</button>
+  </div>
 </div>
 
 <div class="page">
@@ -403,32 +410,32 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
     <div class="header-top">
       <div>
         <div class="header-eyebrow">Amgreat North America · Operation-Finance</div>
-        <div class="header-title">Finance Manager<br><em>面试评分表</em></div>
-        <div class="header-rule">评分规则：5 优秀 · 3 达标 · 1 不足</div>
+        <div class="header-title">Finance Manager<br><em data-i18n="headerSubtitle">面试评分表</em></div>
+        <div class="header-rule" data-i18n="ruleLine">评分规则：5 优秀 · 3 达标 · 1 不足</div>
       </div>
-      <div id="overall-badge">尚未评分</div>
+      <div id="overall-badge" data-i18n="notScored">尚未评分</div>
     </div>
     <div class="header-meta">
-      <div class="meta-item"><span class="meta-label">候选人</span><span class="meta-value" id="cand-name-display">—</span></div>
-      <div class="meta-item"><span class="meta-label">年份</span><span class="meta-value" id="yr">2026</span></div>
-      <div class="meta-item"><span class="meta-label">评委人数</span><span class="meta-value" id="judge-count">—</span></div>
-      <div class="meta-item"><span class="meta-label">平均总分</span><span class="meta-value" id="avg-score">—</span></div>
+      <div class="meta-item"><span class="meta-label" data-i18n="metaCandidate">候选人</span><span class="meta-value" id="cand-name-display">—</span></div>
+      <div class="meta-item"><span class="meta-label" data-i18n="metaYear">年份</span><span class="meta-value" id="yr">2026</span></div>
+      <div class="meta-item"><span class="meta-label" data-i18n="metaJudges">评委人数</span><span class="meta-value" id="judge-count">—</span></div>
+      <div class="meta-item"><span class="meta-label" data-i18n="metaAvg">平均总分</span><span class="meta-value" id="avg-score">—</span></div>
     </div>
   </div>
 
   <!-- Candidate bar -->
   <div class="cand-bar" id="cand-bar">
     <div id="cand-chips"></div>
-    <button class="cand-add-btn" id="cand-add-btn" onclick="showAddCandidate()">＋ 新建候选人</button>
+    <button class="cand-add-btn" id="cand-add-btn" onclick="showAddCandidate()" data-i18n="addCandidate">＋ 新建候选人</button>
     <div class="cand-add-form hidden" id="cand-add-form">
-      <input class="cand-add-input" id="cand-add-input" type="text" placeholder="候选人姓名" maxlength="40"
+      <input class="cand-add-input" id="cand-add-input" type="text" data-i18n-ph="candNamePh" placeholder="候选人姓名" maxlength="40"
         onkeydown="if(event.key==='Enter')confirmAddCandidate();if(event.key==='Escape')hideAddCandidate()">
-      <button class="cand-confirm-btn" onclick="confirmAddCandidate()">确认</button>
-      <button class="cand-cancel-btn" onclick="hideAddCandidate()">取消</button>
+      <button class="cand-confirm-btn" onclick="confirmAddCandidate()" data-i18n="confirm">确认</button>
+      <button class="cand-cancel-btn" onclick="hideAddCandidate()" data-i18n="cancel">取消</button>
     </div>
     <button class="cand-cmp-btn" id="cand-cmp-btn" onclick="toggleCandCompare()">
       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      候选人对比
+      <span data-i18n="candCompare">候选人对比</span>
     </button>
   </div>
 
@@ -438,28 +445,28 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
     <div id="qlist"></div>
     <div class="summary">
       <div class="summary-grid">
-        <div class="stat-card"><div class="stat-label">加权总分</div><div class="stat-value" id="wscore">—</div></div>
-        <div class="stat-card"><div class="stat-label">已评题目</div><div class="stat-value" id="rcnt">0/13</div></div>
-        <div class="stat-card"><div class="stat-label">录用建议</div><div class="stat-value band" id="pband">—</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="statWeighted">加权总分</div><div class="stat-value" id="wscore">—</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="statRated">已评题目</div><div class="stat-value" id="rcnt">0/13</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="statVerdict">录用建议</div><div class="stat-value band" id="pband">—</div></div>
       </div>
-      <div class="progress-header"><span>完成进度</span><span id="pct">0%</span></div>
+      <div class="progress-header"><span data-i18n="progress">完成进度</span><span id="pct">0%</span></div>
       <div class="progress-track"><div class="progress-fill" id="pbar" style="width:0%"></div></div>
       <div style="display:flex;gap:10px;margin-top:1.25rem;flex-wrap:wrap;" id="action-btns">
         <button class="export-btn" style="margin-top:0" onclick="doExport()">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          导出评分报告
+          <span data-i18n="exportBtn">导出评分报告</span>
         </button>
         <button class="export-btn" style="margin-top:0;background:var(--white);color:var(--accent);border:1.5px solid var(--accent);" onmouseover="this.style.background='var(--accent-soft)'" onmouseout="this.style.background='var(--white)'" onclick="doPrint()">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          打印 / 存为 PDF
+          <span data-i18n="printBtn">打印 / 存为 PDF</span>
         </button>
         <button id="resume-view-btn" class="export-btn" style="margin-top:0;background:var(--white);color:var(--green);border:1.5px solid var(--green-line);display:none;" onmouseover="this.style.background='var(--green-dim)'" onmouseout="this.style.background='var(--white)'" onclick="openResume(activeId||myId)">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          查看简历
+          <span data-i18n="viewResume">查看简历</span>
         </button>
         <button id="resume-upload-btn" class="export-btn" style="margin-top:0;background:var(--white);color:var(--ink-soft);border:1.5px dashed var(--line);display:none;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='var(--white)'" onclick="triggerResumeUpload(activeId||myId)">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-          添加简历链接
+          <span data-i18n="addResumeLink">添加简历链接</span>
         </button>
       </div>
       <div class="last-update" id="last-update"></div>
@@ -479,27 +486,174 @@ body { font-family: 'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif; 
 const TOTAL_Q = 13;
 const QS = [
   // ── 模块一 · 全周期会计与财务合规 25% ──
-  { id:'Q1', num:1, mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'月结全流程描述', full:'请描述你在当前或上一个岗位中完成月结（month-end close）的完整流程，包括你负责的具体步骤和遇到过的最大挑战。', w:.07, r1:'描述模糊，未提及具体步骤', r3:'能描述标准月结流程（JE、reconciliation、trial balance），有实际操作经验', r5:'流程完整，有独立负责 close 并解决重大差异的真实案例' },
-  { id:'Q2', num:2, mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'费用审核与费控实战', full:'请举一个你发现或拦截异常费用报销的真实案例——你是如何识别问题的？如何在坚持费控原则的同时推动业务部门配合？有没有主动建立或优化过费用报销审核机制（如额度预警、凭证规则、超支上报流程）？', w:.10, r1:'无费用审核经验，或遇阻力后直接妥协放行', r3:'有日常费用报销审核经验，能识别常见违规，处理过跨部门摩擦', r5:'有主动设计或优化费控机制的经验，能量化拦截效果，兼顾原则性与业务协作' },
-  { id:'Q11', num:3, mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'US GAAP ToB 实操', full:'请描述你在 US GAAP 框架下处理 ToB 业务的经验：如何管理 AR 账龄、返利折扣的账务处理？收入确认（ASC 606）中遇到过哪些判断难点？', w:.08, r1:'不熟悉 US GAAP，无 ToB 财务经验', r3:'有 US GAAP 下 AR / Revenue 日常处理经验，了解 ASC 606 基本要求', r5:'有独立处理复杂返利结构、AR 账龄分析并推动坏账政策的实战经验，能清晰阐述 ASC 606 五步法应用' },
+  { id:'Q1', num:1, mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'月结全流程描述', full:'请描述你在当前或上一个岗位中完成月结（month-end close）的完整流程，包括你负责的具体步骤和遇到过的最大挑战。', w:.07, r1:'描述模糊，未提及具体步骤', r3:'能描述标准月结流程（JE、reconciliation、trial balance），有实际操作经验', r5:'流程完整，有独立负责 close 并解决重大差异的真实案例', modE:'Module 1 · Full-Cycle Accounting & Compliance', titleE:'Month-End Close Walkthrough', fullE:'Walk us through the complete month-end close process in your current or most recent role, including the specific steps you owned and the biggest challenge you faced.', r1E:'Vague description, no concrete steps mentioned', r3E:'Can describe a standard close process (JEs, reconciliation, trial balance) with hands-on experience', r5E:'Complete process ownership, with a real case of independently running the close and resolving a major discrepancy' },
+  { id:'Q2', num:2, mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'费用审核与费控实战', full:'请举一个你发现或拦截异常费用报销的真实案例——你是如何识别问题的？如何在坚持费控原则的同时推动业务部门配合？有没有主动建立或优化过费用报销审核机制（如额度预警、凭证规则、超支上报流程）？', w:.10, r1:'无费用审核经验，或遇阻力后直接妥协放行', r3:'有日常费用报销审核经验，能识别常见违规，处理过跨部门摩擦', r5:'有主动设计或优化费控机制的经验，能量化拦截效果，兼顾原则性与业务协作', modE:'Module 1 · Full-Cycle Accounting & Compliance', titleE:'Expense Review & Cost Control', fullE:'Give a real example where you caught or blocked an irregular expense reimbursement — how did you identify it, and how did you keep business teams cooperative while holding the line on policy? Have you ever built or improved an expense review mechanism (threshold alerts, documentation rules, overspend escalation)?', r1E:'No expense review experience, or caves to pressure and approves anyway', r3E:'Routine expense review experience, can spot common violations, has handled cross-team friction', r5E:'Has proactively designed or improved cost-control mechanisms with quantified results, balancing principles and business partnership' },
+  { id:'Q11', num:3, mod:'模块一 · 全周期会计与财务合规', mw:'25%', title:'US GAAP ToB 实操', full:'请描述你在 US GAAP 框架下处理 ToB 业务的经验：如何管理 AR 账龄、返利折扣的账务处理？收入确认（ASC 606）中遇到过哪些判断难点？', w:.08, r1:'不熟悉 US GAAP，无 ToB 财务经验', r3:'有 US GAAP 下 AR / Revenue 日常处理经验，了解 ASC 606 基本要求', r5:'有独立处理复杂返利结构、AR 账龄分析并推动坏账政策的实战经验，能清晰阐述 ASC 606 五步法应用', modE:'Module 1 · Full-Cycle Accounting & Compliance', titleE:'US GAAP B2B Operations', fullE:'Describe your experience handling B2B business under US GAAP: how do you manage AR aging and account for rebates and discounts? What judgment calls have you faced in revenue recognition (ASC 606)?', r1E:'Unfamiliar with US GAAP, no B2B finance experience', r3E:'Day-to-day AR / revenue experience under US GAAP, understands ASC 606 basics', r5E:'Has independently handled complex rebate structures and AR aging analysis, driven bad-debt policy, and can clearly articulate the ASC 606 five-step model' },
   // ── 模块二 · NetSuite 与系统工具 15% ──
-  { id:'Q3', num:4, mod:'模块二 · NetSuite 与系统工具', mw:'15%', title:'NetSuite 系统深度', full:'你使用 NetSuite 的深度如何？有没有作为系统管理员或超级用户的经验（维护 CoA、配置审批流、培训团队）？', w:.10, r1:'仅用过基础功能', r3:'有日常 AP / AR / GL 操作经验', r5:'担任过区域系统 owner，有配置经验，能培训他人' },
-  { id:'Q4', num:5, mod:'模块二 · NetSuite 与系统工具', mw:'15%', title:'Excel / BI Dashboard 搭建', full:'请举一个你用 Excel 或 BI 工具构建财务 dashboard 的案例，数据来源是什么，解决了什么业务问题？', w:.05, r1:'只有基础 Excel 使用', r3:'有 Power Query / Pivot / XLOOKUP 实际案例，有向管理层汇报经验', r5:'有端到端 dashboard 搭建经验（Power BI / Looker），能说明对决策的影响' },
+  { id:'Q3', num:4, mod:'模块二 · NetSuite 与系统工具', mw:'15%', title:'NetSuite 系统深度', full:'你使用 NetSuite 的深度如何？有没有作为系统管理员或超级用户的经验（维护 CoA、配置审批流、培训团队）？', w:.10, r1:'仅用过基础功能', r3:'有日常 AP / AR / GL 操作经验', r5:'担任过区域系统 owner，有配置经验，能培训他人', modE:'Module 2 · NetSuite & Systems', titleE:'NetSuite Depth', fullE:'How deep is your NetSuite experience? Have you been a system admin or super-user (maintaining the CoA, configuring approval flows, training the team)?', r1E:'Basic features only', r3E:'Day-to-day AP / AR / GL operations experience', r5E:'Has been a regional system owner with configuration experience, able to train others' },
+  { id:'Q4', num:5, mod:'模块二 · NetSuite 与系统工具', mw:'15%', title:'Excel / BI Dashboard 搭建', full:'请举一个你用 Excel 或 BI 工具构建财务 dashboard 的案例，数据来源是什么，解决了什么业务问题？', w:.05, r1:'只有基础 Excel 使用', r3:'有 Power Query / Pivot / XLOOKUP 实际案例，有向管理层汇报经验', r5:'有端到端 dashboard 搭建经验（Power BI / Looker），能说明对决策的影响', modE:'Module 2 · NetSuite & Systems', titleE:'Excel / BI Dashboard Building', fullE:'Give an example of a finance dashboard you built with Excel or a BI tool — what was the data source, and what business problem did it solve?', r1E:'Basic Excel only', r3E:'Real Power Query / Pivot / XLOOKUP cases, has presented to management', r5E:'End-to-end dashboard experience (Power BI / Looker) and can explain its impact on decisions' },
   // ── 模块三 · 收入确认与电商跨境 15% ──
-  { id:'Q5', num:6, mod:'模块三 · 收入确认与电商跨境', mw:'15%', title:'Shopify 电商收入对账', full:'你是否有过 Shopify 或类似电商平台的收入对账经验？如何确保 ERP 数据与平台数据一致（含退款、折扣、捆绑销售）？', w:.08, r1:'没有电商财务经验', r3:'有零售或平台对账经验，理解 ASC 606', r5:'有 Shopify / PayPal / Stripe settlement reconciliation 直接操作经验' },
-  { id:'Q6', num:7, mod:'模块三 · 收入确认与电商跨境', mw:'15%', title:'跨境内部交易与抵销', full:'你熟悉跨境交易中的内部交易（intercompany transactions）和月度抵销分录吗？请举一个实际案例。', w:.07, r1:'不了解 intercompany 概念', r3:'理解概念，有一定实际经验', r5:'有在多实体环境中独立完成 intercompany reconciliation 和 elimination 的经验' },
+  { id:'Q5', num:6, mod:'模块三 · 收入确认与电商跨境', mw:'15%', title:'Shopify 电商收入对账', full:'你是否有过 Shopify 或类似电商平台的收入对账经验？如何确保 ERP 数据与平台数据一致（含退款、折扣、捆绑销售）？', w:.08, r1:'没有电商财务经验', r3:'有零售或平台对账经验，理解 ASC 606', r5:'有 Shopify / PayPal / Stripe settlement reconciliation 直接操作经验', modE:'Module 3 · Revenue Recognition & E-commerce', titleE:'Shopify Revenue Reconciliation', fullE:'Have you reconciled revenue for Shopify or a similar e-commerce platform? How do you keep ERP data consistent with platform data (refunds, discounts, bundles)?', r1E:'No e-commerce finance experience', r3E:'Retail or platform reconciliation experience, understands ASC 606', r5E:'Direct hands-on Shopify / PayPal / Stripe settlement reconciliation experience' },
+  { id:'Q6', num:7, mod:'模块三 · 收入确认与电商跨境', mw:'15%', title:'跨境内部交易与抵销', full:'你熟悉跨境交易中的内部交易（intercompany transactions）和月度抵销分录吗？请举一个实际案例。', w:.07, r1:'不了解 intercompany 概念', r3:'理解概念，有一定实际经验', r5:'有在多实体环境中独立完成 intercompany reconciliation 和 elimination 的经验', modE:'Module 3 · Revenue Recognition & E-commerce', titleE:'Intercompany & Eliminations', fullE:'Are you familiar with cross-border intercompany transactions and monthly elimination entries? Share a real example.', r1E:'Does not understand the intercompany concept', r3E:'Understands the concept with some hands-on experience', r5E:'Has independently completed intercompany reconciliation and eliminations in a multi-entity environment' },
   // ── 模块四 · 预算规划与分析 15% ──
-  { id:'Q7', num:8, mod:'模块四 · 预算规划与分析', mw:'15%', title:'年度预算、滚动预测与超支拦截', full:'请描述你参与或主导年度预算（AOP）编制的经历：数据怎么收集、怎么跑 BvA？你有没有做过月度或季度滚动预测（Rolling Forecast）？当某部门出现超预算支出时，你的应对机制是什么？', w:.15, r1:'无预算编制经验，或只做过简单汇总', r3:'参与过部门级预算编制，能输出 BvA 报告，有一定差异分析经验', r5:'主导过完整 AOP + 滚动 Forecast 流程，有主动预警超支、向管理层提出费用优化建议并落地的真实案例' },
+  { id:'Q7', num:8, mod:'模块四 · 预算规划与分析', mw:'15%', title:'年度预算、滚动预测与超支拦截', full:'请描述你参与或主导年度预算（AOP）编制的经历：数据怎么收集、怎么跑 BvA？你有没有做过月度或季度滚动预测（Rolling Forecast）？当某部门出现超预算支出时，你的应对机制是什么？', w:.15, r1:'无预算编制经验，或只做过简单汇总', r3:'参与过部门级预算编制，能输出 BvA 报告，有一定差异分析经验', r5:'主导过完整 AOP + 滚动 Forecast 流程，有主动预警超支、向管理层提出费用优化建议并落地的真实案例', modE:'Module 4 · Budgeting & FP&A', titleE:'Annual Budget, Rolling Forecast & Overspend Control', fullE:'Describe your role in annual budget (AOP) preparation: how did you gather data and run BvA? Have you done monthly or quarterly rolling forecasts? When a department overspends, what is your response mechanism?', r1E:'No budgeting experience, or simple roll-ups only', r3E:'Has participated in department-level budgeting, can produce BvA reports, some variance analysis experience', r5E:'Has led a full AOP + rolling forecast cycle, with real cases of proactively flagging overspend and landing cost-optimization proposals with management' },
   // ── 模块五 · 税务合规 10% ──
-  { id:'Q8', num:9, mod:'模块五 · 税务合规', mw:'10%', title:'1099 / W-9 / Sales Tax 合规', full:'你有处理过 1099-NEC / MISC 申报、W-9 / W-8 文件维护的经验吗？如何判断多州 Sales Tax Nexus 义务？', w:.10, r1:'无美国税务合规经验', r3:'处理过 1099 申报，了解 Sales Tax 基本概念', r5:'有完整多州 Sales Tax 管理经验，使用过 Avalara / TaxJar，能主动识别合规风险' },
+  { id:'Q8', num:9, mod:'模块五 · 税务合规', mw:'10%', title:'1099 / W-9 / Sales Tax 合规', full:'你有处理过 1099-NEC / MISC 申报、W-9 / W-8 文件维护的经验吗？如何判断多州 Sales Tax Nexus 义务？', w:.10, r1:'无美国税务合规经验', r3:'处理过 1099 申报，了解 Sales Tax 基本概念', r5:'有完整多州 Sales Tax 管理经验，使用过 Avalara / TaxJar，能主动识别合规风险', modE:'Module 5 · Tax Compliance', titleE:'1099 / W-9 / Sales Tax Compliance', fullE:'Have you handled 1099-NEC / MISC filings and W-9 / W-8 document maintenance? How do you assess multi-state sales tax nexus obligations?', r1E:'No US tax compliance experience', r3E:'Has filed 1099s, understands sales tax basics', r5E:'Full multi-state sales tax management experience, has used Avalara / TaxJar, proactively identifies compliance risk' },
   // ── 模块六 · 软实力与文化契合 20% ──
-  { id:'Q9', num:10, mod:'模块六 · 软实力与文化契合', mw:'20%', title:'跨部门坚守财务政策', full:'请举一个你必须在跨部门合作中坚持财务政策（如拒绝报销或要求补凭证），遭遇阻力的案例和处理方式。公司需要"敢拦超支、敢顶部门压力"的人——请用具体事例说明你的原则性。', w:.08, r1:'无相关经验或直接妥协', r3:'能描述以沟通化解阻力的案例，结果合理', r5:'既坚守原则又维护关系，有清晰的沟通策略和正向结果，展现出强烈的原则性' },
-  { id:'Q12', num:11, mod:'模块六 · 软实力与文化契合', mw:'20%', title:'中英文工作语言能力', full:'请用英文描述你上一个岗位的核心职责（1-2分钟），然后切换回中文总结。评估候选人中英文听说读写的流畅度和切换自如程度。', w:.05, r1:'中英文之一明显不流畅，难以胜任双语工作环境', r3:'中英文均可基本沟通，书面表达基本准确，偶有不流畅', r5:'中英文均为工作语言水平，表达流畅自如，切换无障碍，书面沟通专业' },
-  { id:'Q13', num:12, mod:'模块六 · 软实力与文化契合', mw:'20%', title:'专业资质 AICPA / CPA', full:'你的 AICPA 或 CPA 考试进度如何？已通过哪些科目？是否有其他财务相关专业认证？', w:.03, r1:'无相关资质且无备考计划', r3:'正在备考或已通过 1-2 科，有明确时间规划', r5:'已通过全科或仅剩 1 科，持有 CPA license 或其他高含金量认证（如 CMA）' },
-  { id:'Q10', num:13, mod:'模块六 · 软实力与文化契合', mw:'20%', title:'AI 与自动化工具应用', full:'你目前用 AI 或自动化工具辅助财务工作的方式有哪些？举一个具体的效率提升案例。', w:.04, r1:'无实际使用经验', r3:'有使用 ChatGPT 辅助文案 / Python 处理数据等经验', r5:'有系统性将 AI / 自动化嵌入财务流程的经验，能量化效率提升' }
+  { id:'Q9', num:10, mod:'模块六 · 软实力与文化契合', mw:'20%', title:'跨部门坚守财务政策', full:'请举一个你必须在跨部门合作中坚持财务政策（如拒绝报销或要求补凭证），遭遇阻力的案例和处理方式。公司需要"敢拦超支、敢顶部门压力"的人——请用具体事例说明你的原则性。', w:.08, r1:'无相关经验或直接妥协', r3:'能描述以沟通化解阻力的案例，结果合理', r5:'既坚守原则又维护关系，有清晰的沟通策略和正向结果，展现出强烈的原则性', modE:'Module 6 · Soft Skills & Culture Fit', titleE:'Holding the Line Cross-Functionally', fullE:'Give an example where you had to enforce finance policy across departments (e.g., rejecting an expense or requiring documentation) and faced pushback. The company needs someone who dares to block overspend and stand up to departmental pressure — show your principles with a concrete story.', r1E:'No relevant experience, or simply gives in', r3E:'Can describe resolving resistance through communication with a reasonable outcome', r5E:'Holds principles while preserving relationships, with a clear communication strategy, positive outcomes, and strong evidence of integrity' },
+  { id:'Q12', num:11, mod:'模块六 · 软实力与文化契合', mw:'20%', title:'中英文工作语言能力', full:'请用英文描述你上一个岗位的核心职责（1-2分钟），然后切换回中文总结。评估候选人中英文听说读写的流畅度和切换自如程度。', w:.05, r1:'中英文之一明显不流畅，难以胜任双语工作环境', r3:'中英文均可基本沟通，书面表达基本准确，偶有不流畅', r5:'中英文均为工作语言水平，表达流畅自如，切换无障碍，书面沟通专业', modE:'Module 6 · Soft Skills & Culture Fit', titleE:'Bilingual (Chinese / English) Proficiency', fullE:'Describe the core responsibilities of your last role in English (1–2 minutes), then switch back to Chinese to summarize. Assess fluency and ease of switching across listening, speaking, reading and writing.', r1E:'One of the two languages is clearly not fluent enough for a bilingual workplace', r3E:'Basic communication in both languages, mostly accurate writing, occasional hesitation', r5E:'Both languages at full working proficiency — fluent, effortless switching, professional written communication' },
+  { id:'Q13', num:12, mod:'模块六 · 软实力与文化契合', mw:'20%', title:'专业资质 AICPA / CPA', full:'你的 AICPA 或 CPA 考试进度如何？已通过哪些科目？是否有其他财务相关专业认证？', w:.03, r1:'无相关资质且无备考计划', r3:'正在备考或已通过 1-2 科，有明确时间规划', r5:'已通过全科或仅剩 1 科，持有 CPA license 或其他高含金量认证（如 CMA）', modE:'Module 6 · Soft Skills & Culture Fit', titleE:'Credentials: AICPA / CPA', fullE:'Where are you in the AICPA or CPA exam process? Which sections have you passed? Any other finance-related certifications?', r1E:'No credentials and no study plan', r3E:'Currently studying or passed 1–2 sections with a clear timeline', r5E:'Passed all (or all but one) sections, holds a CPA license or another high-value certification (e.g., CMA)' },
+  { id:'Q10', num:13, mod:'模块六 · 软实力与文化契合', mw:'20%', title:'AI 与自动化工具应用', full:'你目前用 AI 或自动化工具辅助财务工作的方式有哪些？举一个具体的效率提升案例。', w:.04, r1:'无实际使用经验', r3:'有使用 ChatGPT 辅助文案 / Python 处理数据等经验', r5:'有系统性将 AI / 自动化嵌入财务流程的经验，能量化效率提升', modE:'Module 6 · Soft Skills & Culture Fit', titleE:'AI & Automation in Finance', fullE:'How do you currently use AI or automation tools to support finance work? Give a concrete efficiency-gain example.', r1E:'No real usage', r3E:'Has used ChatGPT for drafting / Python for data processing, etc.', r5E:'Has systematically embedded AI / automation into finance workflows with quantified efficiency gains' }
 ];
 
 const COLORS = ['#1a3a5c','#c0392b','#1a7a48','#b7770d','#7b2d8b','#0e6e8c'];
+
+// ── i18n ──────────────────────────────────────────────
+let lang = localStorage.getItem('sc_lang') || 'zh';
+
+const T = {
+zh: {
+  syncSaving:'同步中…', syncSaved:'已同步 ✓', syncError:'同步失败',
+  appTitle:'Finance Manager 面试评分表 · Amgreat North America',
+  nameBoxTitle:'Finance Manager 面试评分表', namePlaceholder:'请输入你的姓名',
+  startBtn:'开始评分', viewOnlyBtn:'仅查看，不评分',
+  headerSubtitle:'面试评分表', ruleLine:'评分规则：5 优秀 · 3 达标 · 1 不足',
+  notScored:'尚未评分', metaCandidate:'候选人', metaYear:'年份', metaJudges:'评委人数', metaAvg:'平均总分',
+  addCandidate:'＋ 新建候选人', candNamePh:'候选人姓名', confirm:'确认', cancel:'取消',
+  candCompare:'候选人对比',
+  statWeighted:'加权总分', statRated:'已评题目', statVerdict:'录用建议', progress:'完成进度',
+  exportBtn:'导出评分报告', printBtn:'打印 / 存为 PDF', viewResume:'查看简历', addResumeLink:'添加简历链接',
+  verdictHi:'强烈推荐录用', verdictMid:'建议考虑（评估短板）', verdictLo:'暂不推荐',
+  avgPrefix:'平均 ', nJudges:'{n} 人',
+  lastUpdate:'最后更新：', compareTab:'综合对比',
+  promptRename:'修改姓名：', promptRenameCand:'修改候选人姓名：',
+  renameFailed:'修改失败，请重试', addCandFailed:'创建候选人失败，请检查网络后重试',
+  saveFailedPrefix:'保存失败：', checkNetwork:'请检查网络',
+  popupBlocked:'浏览器阻止了弹出窗口。\n\n请点击地址栏右侧的弹出拦截提示，选择「允许」后重试。',
+  popupBlockedShort:'弹出窗口被拦截，请允许后重试',
+  readonly:'👁 只读',
+  noCandidates:'还没有候选人', noCandidatesHint:'点击「＋ 新建候选人」开始评估', noCandidatesHintTop:'点击上方「＋ 新建候选人」开始评估',
+  emptyCompare:'暂无评分数据', emptyCompareHint:'评委进入页面开始打分后，对比数据将实时出现在这里',
+  noScoresYet:'暂无评分', bestOverall:'综合最高', candidateTag:'候选人',
+  qRatedOf:'{c}/{t} 题已评', qTally:'{c}/{t} 题', evaluatorsLabel:'评委：', viewDetail:'查看详情 →',
+  viewResumeBtn:'📄 查看简历', addResumeBtn:'📎 添加简历链接',
+  chipViewResume:'查看简历', chipAddResume:'添加简历链接',
+  perQTitle:'各题得分横向对比', bestMark:'▲ 该题最高分',
+  thQuestion:'题目', thWeight:'权重', thAvg:'平均',
+  totalRow:'加权总分', verdictRow:'录用建议', printCmpBtn:'打印对比报告',
+  weightLabel:'权重',
+  rubBetween13:'介于「不足」(1) 与「达标」(3) 之间', rubBetween35:'介于「达标」(3) 与「优秀」(5) 之间',
+  ptSuffix:'分',
+  notePh:'面试备注…', noteReadonly:'（只读）',
+  scExcellent:'优秀', scMeets:'达标', scBelow:'不足', scNone:'未评',
+  linkModalTitle:'添加简历链接',
+  driveSteps:'<strong>Google Drive 步骤：</strong><br>1. 右键 PDF → 共享 → 「知道链接的任何人可查看」<br>2. 复制链接，粘贴到上方即可',
+  confirmAdd:'确认添加', changeLink:'更换链接', openNew:'在新窗口打开', closeBtn:'✕ 关闭',
+  resumeModalDefault:'候选人简历', resumeSuffix:' · 简历', candidateFallback:'候选人',
+  reportTitle:'面试评分报告', cmpReportTitle:'候选人综合对比报告',
+  interviewer:'面试官', interviewDate:'面试日期', completion:'完成进度', incomplete:'未完成',
+  overviewTitle:'各题得分总览',
+  footerSystem:'Amgreat North America · Finance Manager 面试评分系统',
+  exportedAt:'导出时间:', generatedAt:'生成时间:', genDate:'生成日期', candCount:'候选人数',
+  cmpLegend:'▲ 该题最高分 &nbsp;|&nbsp; 🟢 ≥4 优秀 &nbsp;🟡 ≥2.5 达标 &nbsp;🔴 不足',
+  exportFilePrefix:'面试评分报告', joinSep:'、', qSuffixCount:' 题)'
+},
+en: {
+  syncSaving:'Syncing…', syncSaved:'Synced ✓', syncError:'Sync failed',
+  appTitle:'Finance Manager Interview Scorecard · Amgreat North America',
+  nameBoxTitle:'Finance Manager Interview Scorecard', namePlaceholder:'Enter your name',
+  startBtn:'Start scoring', viewOnlyBtn:'View only (no scoring)',
+  headerSubtitle:'Interview Scorecard', ruleLine:'Scoring: 5 Excellent · 3 Meets bar · 1 Below bar',
+  notScored:'Not scored yet', metaCandidate:'Candidate', metaYear:'Year', metaJudges:'Interviewers', metaAvg:'Avg score',
+  addCandidate:'＋ New candidate', candNamePh:'Candidate name', confirm:'Confirm', cancel:'Cancel',
+  candCompare:'Compare candidates',
+  statWeighted:'Weighted score', statRated:'Rated', statVerdict:'Recommendation', progress:'Progress',
+  exportBtn:'Export report', printBtn:'Print / Save as PDF', viewResume:'View resume', addResumeLink:'Add resume link',
+  verdictHi:'Strong hire', verdictMid:'Consider (assess gaps)', verdictLo:'Not recommended',
+  avgPrefix:'Avg ', nJudges:'{n}',
+  lastUpdate:'Last updated: ', compareTab:'Compare',
+  promptRename:'Edit your name:', promptRenameCand:'Edit candidate name:',
+  renameFailed:'Update failed, please retry', addCandFailed:'Failed to create candidate — check your network and retry',
+  saveFailedPrefix:'Save failed: ', checkNetwork:'check your network',
+  popupBlocked:'The browser blocked the pop-up window.\n\nClick the pop-up blocker icon in the address bar, choose “Allow”, then retry.',
+  popupBlockedShort:'Pop-up blocked — allow pop-ups and retry',
+  readonly:'👁 View only',
+  noCandidates:'No candidates yet', noCandidatesHint:'Click “＋ New candidate” to start', noCandidatesHintTop:'Click “＋ New candidate” above to start',
+  emptyCompare:'No scores yet', emptyCompareHint:'Once interviewers start scoring, comparison data appears here in real time',
+  noScoresYet:'No scores yet', bestOverall:'Top overall', candidateTag:'Candidate',
+  qRatedOf:'{c}/{t} rated', qTally:'{c}/{t}', evaluatorsLabel:'Scored by: ', viewDetail:'View details →',
+  viewResumeBtn:'📄 View resume', addResumeBtn:'📎 Add resume link',
+  chipViewResume:'View resume', chipAddResume:'Add resume link',
+  perQTitle:'Per-question score comparison', bestMark:'▲ Highest score',
+  thQuestion:'Question', thWeight:'Weight', thAvg:'Avg',
+  totalRow:'Weighted total', verdictRow:'Recommendation', printCmpBtn:'Print comparison report',
+  weightLabel:'Weight',
+  rubBetween13:'Between “Below bar” (1) and “Meets bar” (3)', rubBetween35:'Between “Meets bar” (3) and “Excellent” (5)',
+  ptSuffix:'',
+  notePh:'Interview notes…', noteReadonly:'(read-only)',
+  scExcellent:'Excellent', scMeets:'Meets', scBelow:'Below', scNone:'N/A',
+  linkModalTitle:'Add resume link',
+  driveSteps:'<strong>Google Drive steps:</strong><br>1. Right-click the PDF → Share → “Anyone with the link can view”<br>2. Copy the link and paste it above',
+  confirmAdd:'Add', changeLink:'Change link', openNew:'Open in new tab', closeBtn:'✕ Close',
+  resumeModalDefault:'Candidate resume', resumeSuffix:' · Resume', candidateFallback:'Candidate',
+  reportTitle:'Interview Score Report', cmpReportTitle:'Candidate Comparison Report',
+  interviewer:'Interviewer', interviewDate:'Interview date', completion:'Completion', incomplete:'Incomplete',
+  overviewTitle:'Score overview',
+  footerSystem:'Amgreat North America · Finance Manager Interview Scoring System',
+  exportedAt:'Exported: ', generatedAt:'Generated: ', genDate:'Date', candCount:'Candidates',
+  cmpLegend:'▲ Highest score &nbsp;|&nbsp; 🟢 ≥4 Excellent &nbsp;🟡 ≥2.5 Meets &nbsp;🔴 Below',
+  exportFilePrefix:'Interview_Report', joinSep:', ', qSuffixCount:')'
+}
+};
+
+function t(k) { return (T[lang] && T[lang][k] !== undefined) ? T[lang][k] : (T.zh[k] ?? k); }
+function tf(k, vars) { let s = t(k); Object.entries(vars).forEach(([key,v]) => { s = s.split('{'+key+'}').join(v); }); return s; }
+window.__t = t;
+
+// Localized question field: qf(q,'title') → q.titleE in EN, q.title in ZH
+function qf(q, f) { return lang === 'en' ? (q[f+'E'] ?? q[f]) : q[f]; }
+
+// Localized rubric line for a score value
+function rubricText(q, v) {
+  const lbl = lang === 'zh' ? v + '分' : 'Score ' + v;
+  if (v === 1) return lbl + ' — ' + qf(q,'r1');
+  if (v === 3) return lbl + ' — ' + qf(q,'r3');
+  if (v === 5) return lbl + ' — ' + qf(q,'r5');
+  if (v < 3) return lbl + ' — ' + t('rubBetween13');
+  return lbl + ' — ' + t('rubBetween35');
+}
+
+function locale() { return lang === 'zh' ? 'zh-CN' : 'en-US'; }
+
+function toggleLang() {
+  lang = lang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('sc_lang', lang);
+  applyLang();
+}
+
+function applyLang() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  document.title = t('appTitle');
+  const btn = document.getElementById('lang-btn');
+  if (btn) btn.textContent = lang === 'zh' ? 'EN' : '中文';
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n')); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.getAttribute('data-i18n-ph')); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.getAttribute('data-i18n-html')); });
+  // Refresh dynamic UI if the app has started
+  const pill = document.getElementById('user-pill');
+  if (pill && (myName || isViewOnly)) {
+    pill.textContent = isViewOnly ? t('readonly') : '✏ ' + myName;
+  }
+  if (candidates.length || Object.keys(allData).length) {
+    renderCandidateBar();
+    updateHeaderStats();
+    renderTabs();
+    renderView();
+  }
+  const upd = activeId ? allData[activeId]?.updatedAt : null;
+  const lu = document.getElementById('last-update');
+  if (lu) lu.textContent = upd ? t('lastUpdate') + new Date(upd).toLocaleString(locale()) : '';
+}
 
 let myName = '';
 let myId = '';
@@ -542,8 +696,8 @@ function renderCandidateBar() {
     const dot = `<span style="width:8px;height:8px;border-radius:50%;background:${isActive?'#fff':vc.main};flex-shrink:0;display:inline-block;box-shadow:${isActive?'0 0 0 1.5px rgba(255,255,255,.5)':'none'};"></span>`;
     const hasResume = !!c.resumeUrl;
     const resumeBtn = hasResume
-      ? `<span class="chip-resume-btn has-resume" onclick="event.stopPropagation();openResume('${c.id}')" title="查看简历（点击更换链接可右键）">📄</span>`
-      : `<span class="chip-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')" title="添加简历链接">📎</span>`;
+      ? `<span class="chip-resume-btn has-resume" onclick="event.stopPropagation();openResume('${c.id}')" title="${t('chipViewResume')}">📄</span>`
+      : `<span class="chip-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')" title="${t('chipAddResume')}">📎</span>`;
     return `<button class="cand-chip${isActive?' active':''}" onclick="switchCandidate('${c.id}')">${dot}${c.name}${resumeBtn}<span class="cand-rename-btn" onclick="event.stopPropagation();renameCandidate('${c.id}','${c.name.replace(/'/g,"\\'")}')">✏</span></button>`;
   }).join('');
   // Update header display
@@ -555,7 +709,7 @@ function renderCandidateBar() {
 }
 
 async function renameCandidate(id, currentName) {
-  const newName = prompt('修改候选人姓名：', currentName);
+  const newName = prompt(t('promptRenameCand'), currentName);
   if (!newName || !newName.trim() || newName.trim() === currentName) return;
   try {
     await window.__sc.renameCandidate(id, newName.trim());
@@ -566,7 +720,7 @@ async function renameCandidate(id, currentName) {
     const nameEl = document.getElementById('cand-name-display');
     if (nameEl && id === activeCandidateId) nameEl.textContent = newName.trim();
   } catch(e) {
-    alert('修改失败，请重试');
+    alert(t('renameFailed'));
   }
 }
 
@@ -620,7 +774,7 @@ async function confirmAddCandidate() {
     window.__sc.subscribeToCandidate(newId, handleScoresUpdate);
   } catch(e) {
     console.error('Add candidate failed', e);
-    alert('创建候选人失败，请检查网络后重试');
+    alert(t('addCandFailed'));
   } finally {
     input.disabled = false;
   }
@@ -664,7 +818,7 @@ function handleScoresUpdate(data) {
   renderTabs();
   renderView();
   const upd = activeId ? allData[activeId]?.updatedAt : null;
-  if (upd) document.getElementById('last-update').textContent = '最后更新：' + new Date(upd).toLocaleString('zh-CN');
+  if (upd) document.getElementById('last-update').textContent = t('lastUpdate') + new Date(upd).toLocaleString(locale());
 }
 
 // ── Identity ──────────────────────────────────────────
@@ -700,7 +854,7 @@ function changeName() {
     setTimeout(() => document.getElementById('name-input').focus(), 80);
     return;
   }
-  const n = prompt('修改姓名：', myName);
+  const n = prompt(t('promptRename'), myName);
   if (!n || !n.trim()) return;
   myName = n.trim(); myId = nameToId(myName);
   localStorage.setItem('sc_name_v2', myName);
@@ -710,7 +864,7 @@ function changeName() {
 
 function startApp() {
   const pill = document.getElementById('user-pill');
-  if (isViewOnly) { pill.textContent = '👁 只读'; pill.classList.add('viewer'); }
+  if (isViewOnly) { pill.textContent = t('readonly'); pill.classList.add('viewer'); }
   else pill.textContent = '✏ ' + myName;
   activeId = isViewOnly ? null : myId;
   // Subscribe to candidates list; score subscription is started inside handleCandidatesUpdate
@@ -778,11 +932,11 @@ function calcW(ratings) {
 }
 
 function verdict(sc) {
-  if (sc === null) return { lbl:'尚未评分', cls:'' };
+  if (sc === null) return { lbl:t('notScored'), cls:'' };
   const s = parseFloat(sc);
-  if (s >= 4.0) return { lbl:'强烈推荐录用', cls:'hi' };
-  if (s >= 3.0) return { lbl:'建议考虑（评估短板）', cls:'mid' };
-  return { lbl:'暂不推荐', cls:'lo' };
+  if (s >= 4.0) return { lbl:t('verdictHi'), cls:'hi' };
+  if (s >= 3.0) return { lbl:t('verdictMid'), cls:'mid' };
+  return { lbl:t('verdictLo'), cls:'lo' };
 }
 
 // Verdict-based color palette used for candidate coloring
@@ -796,17 +950,17 @@ function verdictColor(ws) {
 
 function updateHeaderStats() {
   const ids = Object.keys(allData);
-  document.getElementById('judge-count').textContent = ids.length ? ids.length + ' 人' : '—';
+  document.getElementById('judge-count').textContent = ids.length ? tf('nJudges',{n:ids.length}) : '—';
   const scores = ids.map(id => calcW(allData[id].ratings||{})).filter(Boolean).map(Number);
   if (!scores.length) {
     document.getElementById('avg-score').textContent = '—';
-    const bg = document.getElementById('overall-badge'); bg.textContent = '尚未评分'; bg.className = ''; return;
+    const bg = document.getElementById('overall-badge'); bg.textContent = t('notScored'); bg.className = ''; return;
   }
   const avg = (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2);
   document.getElementById('avg-score').textContent = avg;
   const v = verdict(avg);
   const bg = document.getElementById('overall-badge');
-  bg.textContent = '平均 ' + avg + ' · ' + v.lbl; bg.className = v.cls;
+  bg.textContent = t('avgPrefix') + avg + ' · ' + v.lbl; bg.className = v.cls;
 }
 
 function updBtns(qid) {
@@ -836,11 +990,7 @@ function updRubric(qid) {
   if (v < 2.5) cls = 'rubric-1';
   else if (v < 4) cls = 'rubric-3';
   else cls = 'rubric-5';
-  if (v === 1) txt = `1分 — ${q.r1}`;
-  else if (v === 3) txt = `3分 — ${q.r3}`;
-  else if (v === 5) txt = `5分 — ${q.r5}`;
-  else if (v < 3) txt = `${v}分 — 介于「不足」(1) 与「达标」(3) 之间`;
-  else txt = `${v}分 — 介于「达标」(3) 与「优秀」(5) 之间`;
+  txt = rubricText(q, v);
   rub.className = `rubric show ${cls}`;
   rub.textContent = txt;
 }
@@ -868,7 +1018,7 @@ function renderTabs() {
     const badge = cnt>0?`<span class="tab-cnt">${cnt}/${TOTAL_Q}${ws?' · '+ws:''}</span>`:'';
     return `<button class="tab${isActive?' active':''}${isMe?' my-tab':''}" onclick="switchTab('${id}')">${isMe?'✏ ':''}${name}${badge}</button>`;
   }).join('');
-  html += `<button class="tab compare-tab${activeId===null?' active':''}" onclick="switchTab(null)">综合对比</button>`;
+  html += `<button class="tab compare-tab${activeId===null?' active':''}" onclick="switchTab(null)">${t('compareTab')}</button>`;
   row.innerHTML = html;
 }
 
@@ -896,7 +1046,7 @@ function triggerResumeUpload(candidateId) {
   const existing = cand?.resumeUrl || '';
   const inp = document.getElementById('link-modal-input');
   inp.value = existing;
-  document.getElementById('link-modal-cand-name').textContent = cand?.name || '候选人';
+  document.getElementById('link-modal-cand-name').textContent = cand?.name || t('candidateFallback');
   document.getElementById('link-modal').style.display = 'flex';
   setTimeout(() => inp.focus(), 80);
 }
@@ -911,7 +1061,7 @@ async function confirmResumeLink() {
   try {
     await window.__sc.updateCandidateResume(id, url);
   } catch(e) {
-    alert('保存失败：' + (e.message || '请检查网络'));
+    alert(t('saveFailedPrefix') + (e.message || t('checkNetwork')));
   }
 }
 
@@ -927,7 +1077,7 @@ function openResume(candidateId) {
   currentResumeCandId = candidateId;
   const embedUrl = cand.resumeUrl;
   const downloadUrl = embedUrl.replace(/\/preview(\?.*)?$/, '/view');
-  document.getElementById('resume-modal-title').textContent = (cand.name || '候选人') + ' · 简历';
+  document.getElementById('resume-modal-title').textContent = (cand.name || t('candidateFallback')) + t('resumeSuffix');
   document.getElementById('resume-download-link').href = downloadUrl;
   document.getElementById('resume-download-link').target = '_blank';
   document.getElementById('resume-progress-bar').style.width = '100%';
@@ -966,7 +1116,7 @@ function renderCandidatesCompare() {
   const el = document.getElementById('candidates-compare-content');
   if (!el) return;
   if (!candidates.length) {
-    el.innerHTML = '<div class="cand-empty">还没有候选人<br><span style="font-size:12px;margin-top:6px;display:block">点击「＋ 新建候选人」开始评估</span></div>';
+    el.innerHTML = `<div class="cand-empty">${t('noCandidates')}<br><span style="font-size:12px;margin-top:6px;display:block">${t('noCandidatesHint')}</span></div>`;
     return;
   }
 
@@ -982,7 +1132,7 @@ function renderCandidatesCompare() {
     });
     const ws = calcW(qScores);
     const v = verdict(ws);
-    const evaluators = iids.map(id => interviewers[id]?.displayName||id).join('、') || '暂无评分';
+    const evaluators = iids.map(id => interviewers[id]?.displayName||id).join(t('joinSep')) || t('noScoresYet');
     const cnt = Object.keys(qScores).length;
     const vc = verdictColor(ws);
     return { ...c, qScores, ws, v, evaluators, cnt, color: vc.main, colorDim: vc.dim, colorLine: vc.line };
@@ -1003,18 +1153,18 @@ function renderCandidatesCompare() {
   const cards = candScores.map((c, i) => {
     const isBestOverall = c.ws !== null && parseFloat(c.ws) === maxWs && wsScores.filter(s=>s===maxWs).length===1;
     return `<div class="cand-cmp-card" style="border:1px solid ${c.colorLine};border-top:3px solid ${c.color};background:${c.colorDim};" onclick="exitCompareGoTo('${c.id}')">
-      ${isBestOverall ? '<span class="cand-cmp-best-badge">综合最高</span>' : ''}
-      <div class="cand-cmp-card-tag" style="color:${c.color};opacity:.8;">候选人 ${String.fromCharCode(65+i)}</div>
+      ${isBestOverall ? `<span class="cand-cmp-best-badge">${t('bestOverall')}</span>` : ''}
+      <div class="cand-cmp-card-tag" style="color:${c.color};opacity:.8;">${t('candidateTag')} ${String.fromCharCode(65+i)}</div>
       <div class="cand-cmp-card-name" style="color:var(--ink);">${c.name}</div>
       <div class="cand-cmp-card-score" style="color:${c.color}">${c.ws ?? '—'}</div>
       <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;${vsStyle(c.v.cls)}">${c.v.lbl}</span>
       <div class="cand-cmp-card-footer" style="border-top:1px solid ${c.colorLine};">
-        ${c.cnt}/${TOTAL_Q} 题已评 &nbsp;·&nbsp; 评委：${c.evaluators}<br>
+        ${tf('qRatedOf',{c:c.cnt,t:TOTAL_Q})} &nbsp;·&nbsp; ${t('evaluatorsLabel')}${c.evaluators}<br>
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-          <span style="font-size:10px;color:${c.color};cursor:pointer;" onclick="exitCompareGoTo('${c.id}')">查看详情 →</span>
+          <span style="font-size:10px;color:${c.color};cursor:pointer;" onclick="exitCompareGoTo('${c.id}')">${t('viewDetail')}</span>
           ${c.resumeUrl
-            ? `<button class="cand-cmp-resume-btn has-resume" onclick="event.stopPropagation();openResume('${c.id}')">📄 查看简历</button>`
-            : `<button class="cand-cmp-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')">📎 添加简历链接</button>`
+            ? `<button class="cand-cmp-resume-btn has-resume" onclick="event.stopPropagation();openResume('${c.id}')">${t('viewResumeBtn')}</button>`
+            : `<button class="cand-cmp-resume-btn" onclick="event.stopPropagation();triggerResumeUpload('${c.id}')">${t('addResumeBtn')}</button>`
           }
         </div>
       </div>
@@ -1034,7 +1184,7 @@ function renderCandidatesCompare() {
   let lastMod = null;
   const bodyRows = QS.map(q => {
     const modRow = q.mod !== lastMod
-      ? `<tr><td colspan="${2+candScores.length}" style="padding:14px 12px 4px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);background:var(--bg);border-bottom:1px solid var(--line-soft);">${q.mod} &nbsp;·&nbsp; ${q.mw}</td></tr>`
+      ? `<tr><td colspan="${2+candScores.length}" style="padding:14px 12px 4px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);background:var(--bg);border-bottom:1px solid var(--line-soft);">${qf(q,'mod')} &nbsp;·&nbsp; ${q.mw}</td></tr>`
       : '';
     lastMod = q.mod;
 
@@ -1047,7 +1197,7 @@ function renderCandidatesCompare() {
     }).join('');
 
     return modRow + `<tr>
-      <td class="ct-qlabel"><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--ink-mute);margin-right:5px;">Q${q.num}</span>${q.title}</td>
+      <td class="ct-qlabel"><span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--ink-mute);margin-right:5px;">Q${q.num}</span>${qf(q,'title')}</td>
       <td class="ct-weight">${Math.round(q.w*100)}%</td>
       ${scoreCols}
     </tr>`;
@@ -1068,29 +1218,29 @@ function renderCandidatesCompare() {
         onmouseover="this.style.background='var(--accent-soft)'" onmouseout="this.style.background='var(--white)'"
         onclick="printCandidatesCompare()">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        打印对比报告
+        ${t('printCmpBtn')}
       </button>
     </div>
     <div class="cand-cmp-cards">${cards}</div>
     <div class="compare-card">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-bottom:1rem;border-bottom:1px solid var(--line-soft);margin-bottom:.5rem;">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);">各题得分横向对比</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-mute);">${t('perQTitle')}</div>
         <div style="display:flex;gap:1rem;flex-wrap:wrap;">
           ${candScores.map(c=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-mid);"><span style="width:10px;height:10px;border-radius:3px;background:${c.color};display:inline-block;"></span>${c.name}</span>`).join('')}
-          <span style="font-size:11px;color:var(--ink-mute);padding-left:8px;border-left:1px solid var(--line);">▲ 该题最高分</span>
+          <span style="font-size:11px;color:var(--ink-mute);padding-left:8px;border-left:1px solid var(--line);">${t('bestMark')}</span>
         </div>
       </div>
       <div style="overflow-x:auto;">
         <table class="compare-table">
           <thead><tr>
-            <th class="ct-qlabel">题目</th>
-            <th class="ct-weight">权重</th>
+            <th class="ct-qlabel">${t('thQuestion')}</th>
+            <th class="ct-weight">${t('thWeight')}</th>
             ${headCols}
           </tr></thead>
           <tbody>${bodyRows}</tbody>
           <tfoot>
-            <tr><td colspan="2" style="font-size:13px;">加权总分</td>${totalCols}</tr>
-            <tr><td colspan="2" style="font-size:13px;">录用建议</td>${verdictCols}</tr>
+            <tr><td colspan="2" style="font-size:13px;">${t('totalRow')}</td>${totalCols}</tr>
+            <tr><td colspan="2" style="font-size:13px;">${t('verdictRow')}</td>${verdictCols}</tr>
           </tfoot>
         </table>
       </div>
@@ -1112,14 +1262,14 @@ function printCandidatesCompare() {
     const ws = calcW(qScores);
     const v = verdict(ws);
     const vc = verdictColor(ws);
-    const evaluators = iids.map(id => interviewers[id]?.displayName||id).join('、') || '暂无评分';
+    const evaluators = iids.map(id => interviewers[id]?.displayName||id).join(t('joinSep')) || t('noScoresYet');
     return { ...c, qScores, ws, v, evaluators, cnt: Object.keys(qScores).length,
              color: vc.main, colorDim: vc.dim, colorLine: vc.line };
   });
 
   const wsScores = candScores.map(c => c.ws !== null ? parseFloat(c.ws) : -1);
   const maxWs = Math.max(...wsScores);
-  const dateStr = new Date().toLocaleDateString('zh-CN', {year:'numeric',month:'long',day:'numeric'});
+  const dateStr = new Date().toLocaleDateString(locale(), {year:'numeric',month:'long',day:'numeric'});
 
   function vs(cls) {
     if (cls==='hi')  return 'background:#ebfaf3;color:#1a7a48;border:1px solid #a3dcbc';
@@ -1133,12 +1283,12 @@ function printCandidatesCompare() {
   const summaryCards = candScores.map((c,i) => {
     const isBest = c.ws!==null && parseFloat(c.ws)===maxWs && wsScores.filter(x=>x===maxWs).length===1;
     return `<div style="flex:1;min-width:130px;background:${c.colorDim};border:1px solid ${c.colorLine};border-top:3px solid ${c.color};border-radius:10px;padding:.9rem 1.1rem;position:relative;">
-      ${isBest?`<span style="position:absolute;top:9px;right:9px;font-size:9px;padding:2px 7px;border-radius:8px;font-family:monospace;background:#ebfaf3;color:#1a7a48;border:1px solid #a3dcbc;">综合最高</span>`:''}
-      <div style="font-size:9px;font-family:monospace;letter-spacing:.08em;color:${c.color};opacity:.8;margin-bottom:3px;">候选人 ${String.fromCharCode(65+i)}</div>
+      ${isBest?`<span style="position:absolute;top:9px;right:9px;font-size:9px;padding:2px 7px;border-radius:8px;font-family:monospace;background:#ebfaf3;color:#1a7a48;border:1px solid #a3dcbc;">${t('bestOverall')}</span>`:''}
+      <div style="font-size:9px;font-family:monospace;letter-spacing:.08em;color:${c.color};opacity:.8;margin-bottom:3px;">${t('candidateTag')} ${String.fromCharCode(65+i)}</div>
       <div style="font-size:14px;font-weight:600;color:#111318;margin-bottom:8px;">${c.name}</div>
       <div style="font-size:28px;font-family:monospace;font-weight:500;color:${c.color};line-height:1;margin-bottom:7px;">${c.ws??'—'}</div>
       <span style="font-size:11px;padding:2px 9px;border-radius:12px;display:inline-block;${vs(c.v.cls)}">${c.v.lbl}</span>
-      <div style="font-size:10px;color:#9aa1b0;margin-top:8px;padding-top:6px;border-top:1px solid ${c.colorLine};">${c.cnt}/${TOTAL_Q} 题 · ${c.evaluators}</div>
+      <div style="font-size:10px;color:#9aa1b0;margin-top:8px;padding-top:6px;border-top:1px solid ${c.colorLine};">${tf('qTally',{c:c.cnt,t:TOTAL_Q})} · ${c.evaluators}</div>
     </div>`;
   }).join('');
 
@@ -1157,7 +1307,7 @@ function printCandidatesCompare() {
   const bodyRows = QS.map(q => {
     let modRow = '';
     if (q.mod !== lastMod) {
-      modRow = `<tr><td colspan="${2+candScores.length}" style="padding:11px 10px 3px;font-size:9px;font-family:monospace;letter-spacing:.1em;text-transform:uppercase;color:#9aa1b0;background:#f7f8fb;border-bottom:1px solid #f0f2f6;">${q.mod} · ${q.mw}</td></tr>`;
+      modRow = `<tr><td colspan="${2+candScores.length}" style="padding:11px 10px 3px;font-size:9px;font-family:monospace;letter-spacing:.1em;text-transform:uppercase;color:#9aa1b0;background:#f7f8fb;border-bottom:1px solid #f0f2f6;">${qf(q,'mod')} · ${q.mw}</td></tr>`;
       lastMod = q.mod;
     }
     const scoreCols = candScores.map(c => {
@@ -1167,7 +1317,7 @@ function printCandidatesCompare() {
       return `<td style="${isBest?'background:#ebfaf3;':''}text-align:center;padding:7px 10px;border-bottom:1px solid #f0f2f6;font-family:monospace;font-size:14px;font-weight:500;color:${sc(s)};">${isBest?'▲ ':''}${disp}</td>`;
     }).join('');
     return modRow + `<tr>
-      <td style="padding:7px 10px;border-bottom:1px solid #f0f2f6;font-size:12.5px;color:#111318;"><span style="font-size:9px;color:#9aa1b0;font-family:monospace;margin-right:4px;">Q${q.num}</span>${q.title}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #f0f2f6;font-size:12.5px;color:#111318;"><span style="font-size:9px;color:#9aa1b0;font-family:monospace;margin-right:4px;">Q${q.num}</span>${qf(q,'title')}</td>
       <td style="text-align:center;padding:7px 10px;border-bottom:1px solid #f0f2f6;font-size:11px;font-family:monospace;color:#9aa1b0;">${Math.round(q.w*100)}%</td>
       ${scoreCols}
     </tr>`;
@@ -1182,8 +1332,8 @@ function printCandidatesCompare() {
   ).join('');
 
   const html = `<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>候选人对比报告 · Finance Manager</title>
+<html lang="${lang==='zh'?'zh-CN':'en'}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${t('cmpReportTitle')} · Finance Manager</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1196,16 +1346,16 @@ body{font-family:'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif;back
 <body>
 <button class="fab" onclick="window.print()">
   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-  打印 / 存为 PDF
+  ${t('printBtn')}
 </button>
 <div class="wrap">
 
 <div style="background:#1a3a5c;border-radius:12px;padding:1.6rem 2rem;margin-bottom:1.25rem;">
   <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:5px;">Amgreat North America · Operation-Finance</div>
   <div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
-    <div style="font-family:'Instrument Serif',Georgia,serif;font-size:22px;color:#fff;line-height:1.25;">Finance Manager<br><em style="color:rgba(255,255,255,.65);">候选人综合对比报告</em></div>
+    <div style="font-family:'Instrument Serif',Georgia,serif;font-size:22px;color:#fff;line-height:1.25;">Finance Manager<br><em style="color:rgba(255,255,255,.65);">${t('cmpReportTitle')}</em></div>
     <div style="display:flex;gap:2rem;flex-wrap:wrap;">
-      ${[['候选人数',candScores.length+' 人'],['生成日期',dateStr],['评分规则','5 优秀 · 3 达标 · 1 不足']].map(([l,v])=>
+      ${[[t('candCount'),tf('nJudges',{n:candScores.length})],[t('genDate'),dateStr],[t('ruleLine').split(/：|: /)[0],t('ruleLine').replace(/^[^：:]*[：:]\s*/,'')]].map(([l,v])=>
         `<div><div style="font-size:9px;font-family:monospace;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:2px;">${l}</div><div style="font-size:12px;color:rgba(255,255,255,.8);font-weight:500;">${v}</div></div>`
       ).join('')}
     </div>
@@ -1216,35 +1366,35 @@ body{font-family:'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif;back
 
 <div style="background:#fff;border:1px solid #e0e3ea;border-radius:12px;padding:1.1rem 1.25rem;">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:.75rem;padding-bottom:.6rem;border-bottom:1px solid #f0f2f6;">
-    <span style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9aa1b0;">各题得分横向对比</span>
-    <span style="font-size:10.5px;color:#9aa1b0;">▲ 该题最高分 &nbsp;|&nbsp; 🟢 ≥4 优秀 &nbsp;🟡 ≥2.5 达标 &nbsp;🔴 不足</span>
+    <span style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9aa1b0;">${t('perQTitle')}</span>
+    <span style="font-size:10.5px;color:#9aa1b0;">${t('cmpLegend')}</span>
   </div>
   <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr>
-        <th style="text-align:left;padding:7px 10px;font-size:10px;font-family:monospace;letter-spacing:.08em;text-transform:uppercase;font-weight:500;border-bottom:2px solid #e0e3ea;color:#6b7384;">题目</th>
-        <th style="text-align:center;padding:7px 10px;font-size:10px;font-family:monospace;letter-spacing:.08em;text-transform:uppercase;font-weight:500;border-bottom:2px solid #e0e3ea;color:#6b7384;">权重</th>
+        <th style="text-align:left;padding:7px 10px;font-size:10px;font-family:monospace;letter-spacing:.08em;text-transform:uppercase;font-weight:500;border-bottom:2px solid #e0e3ea;color:#6b7384;">${t('thQuestion')}</th>
+        <th style="text-align:center;padding:7px 10px;font-size:10px;font-family:monospace;letter-spacing:.08em;text-transform:uppercase;font-weight:500;border-bottom:2px solid #e0e3ea;color:#6b7384;">${t('thWeight')}</th>
         ${headCols}
       </tr></thead>
       <tbody>${bodyRows}</tbody>
       <tfoot>
-        <tr><td colspan="2" style="padding:10px;font-size:13px;font-weight:600;border-top:2px solid #e0e3ea;">加权总分</td>${totalCols}</tr>
-        <tr><td colspan="2" style="padding:8px 10px;font-size:13px;font-weight:600;">录用建议</td>${verdictCols}</tr>
+        <tr><td colspan="2" style="padding:10px;font-size:13px;font-weight:600;border-top:2px solid #e0e3ea;">${t('totalRow')}</td>${totalCols}</tr>
+        <tr><td colspan="2" style="padding:8px 10px;font-size:13px;font-weight:600;">${t('verdictRow')}</td>${verdictCols}</tr>
       </tfoot>
     </table>
   </div>
 </div>
 
 <div style="margin-top:1.25rem;padding-top:.75rem;border-top:1px solid #e0e3ea;display:flex;justify-content:space-between;font-family:monospace;font-size:10px;color:#9aa1b0;flex-wrap:wrap;gap:8px;">
-  <span>Amgreat North America · Finance Manager 面试评分系统</span>
-  <span>生成时间：${new Date().toLocaleString('zh-CN')}</span>
+  <span>${t('footerSystem')}</span>
+  <span>${t('generatedAt')}${new Date().toLocaleString(locale())}</span>
 </div>
 </div></body></html>`;
 
   const blob = new Blob([html], {type:'text/html;charset=utf-8'});
   const blobUrl = URL.createObjectURL(blob);
   const win = window.open(blobUrl, '_blank');
-  if (!win) { URL.revokeObjectURL(blobUrl); alert('弹出窗口被拦截，请允许后重试'); return; }
+  if (!win) { URL.revokeObjectURL(blobUrl); alert(t('popupBlockedShort')); return; }
   win.addEventListener('load', () => {
     setTimeout(() => { win.print(); URL.revokeObjectURL(blobUrl); }, 400);
   });
@@ -1269,7 +1419,7 @@ function renderView() {
     document.getElementById('individual-view').style.display = 'none';
     document.getElementById('compare-view').style.display = 'block';
     document.getElementById('compare-content').innerHTML =
-      '<div class="cand-empty">还没有候选人<br><span style="font-size:12px;margin-top:6px;display:block">点击上方「＋ 新建候选人」开始评估</span></div>';
+      `<div class="cand-empty">${t('noCandidates')}<br><span style="font-size:12px;margin-top:6px;display:block">${t('noCandidatesHintTop')}</span></div>`;
     return;
   }
   if (activeId === null) {
@@ -1297,17 +1447,17 @@ function renderIndividual(id) {
   if (upBtn) upBtn.style.display = hasRes ? 'none' : '';
   const list = document.getElementById('qlist'); list.innerHTML = ''; let lastMod = null;
   QS.forEach(q => {
-    if (q.mod !== lastMod) { const sl=document.createElement('div'); sl.className='section-label'; sl.textContent=q.mod+' · 权重 '+q.mw; list.appendChild(sl); lastMod=q.mod; }
+    if (q.mod !== lastMod) { const sl=document.createElement('div'); sl.className='section-label'; sl.textContent=qf(q,'mod')+' · '+t('weightLabel')+' '+q.mw; list.appendChild(sl); lastMod=q.mod; }
     const v=ratings[q.id]; const dis=isMe?'':' disabled';
     const sdStyle='color:'+scoreColor(v);
     const rubCls=v===undefined?'rubric':`rubric show ${v<2.5?'rubric-1':v<4?'rubric-3':'rubric-5'}`;
-    const rubTxt=v===undefined?'':(v===1?`1分 — ${q.r1}`:v===3?`3分 — ${q.r3}`:v===5?`5分 — ${q.r5}`:v<3?`${v}分 — 介于「不足」(1) 与「达标」(3) 之间`:`${v}分 — 介于「达标」(3) 与「优秀」(5) 之间`);
+    const rubTxt=v===undefined?'':rubricText(q,v);
     const btnH=[1,3,5].map(r=>`<button class="rbtn${v===r?' s'+r:''}" id="b-${q.id}-${r}"${dis} onclick="setR('${q.id}',${r})">${r}</button>`).join('');
     const slHidden = v===undefined?' hidden':'';
     const slVal = v!==undefined?v:3;
     const slDis = isMe?'':' disabled';
     const card=document.createElement('div'); card.className='qcard';
-    card.innerHTML=`<div class="qcard-head"><div class="qcard-info"><div class="qcode">Q${q.num} · ${q.mod.split('·')[0].trim()}</div><div class="qtitle">${q.title}</div><div class="qfull">${q.full}</div></div><span class="qweight">${Math.round(q.w*100)}%</span></div><div class="rating-row"><div class="rating-btns">${btnH}</div><span class="score-display" id="sd-${q.id}" style="${sdStyle}">${v!==undefined?v:'—'}</span></div><div class="slider-row${slHidden}" id="sl-${q.id}"><span class="sl-label">1</span><input type="range" class="score-slider" id="slider-${q.id}" min="1" max="5" step="0.5" value="${slVal}"${slDis} oninput="setSlider('${q.id}',parseFloat(this.value))"><span class="sl-label">5</span></div><div class="${rubCls}" id="rub-${q.id}">${rubTxt}</div><textarea class="note-input" id="nt-${q.id}" placeholder="${isMe?'面试备注…':'（只读）'}" ${isMe?`onchange="setNote('${q.id}',this.value)"`:' readonly'}>${notes[q.id]||''}</textarea>`;
+    card.innerHTML=`<div class="qcard-head"><div class="qcard-info"><div class="qcode">Q${q.num} · ${qf(q,'mod').split('·')[0].trim()}</div><div class="qtitle">${qf(q,'title')}</div><div class="qfull">${qf(q,'full')}</div></div><span class="qweight">${Math.round(q.w*100)}%</span></div><div class="rating-row"><div class="rating-btns">${btnH}</div><span class="score-display" id="sd-${q.id}" style="${sdStyle}">${v!==undefined?v:'—'}</span></div><div class="slider-row${slHidden}" id="sl-${q.id}"><span class="sl-label">1</span><input type="range" class="score-slider" id="slider-${q.id}" min="1" max="5" step="0.5" value="${slVal}"${slDis} oninput="setSlider('${q.id}',parseFloat(this.value))"><span class="sl-label">5</span></div><div class="${rubCls}" id="rub-${q.id}">${rubTxt}</div><textarea class="note-input" id="nt-${q.id}" placeholder="${isMe?t('notePh'):t('noteReadonly')}" ${isMe?`onchange="setNote('${q.id}',this.value)"`:' readonly'}>${notes[q.id]||''}</textarea>`;
     list.appendChild(card);
   });
 }
@@ -1315,25 +1465,25 @@ function renderIndividual(id) {
 function renderCompare() {
   const ids = Object.keys(allData);
   const el = document.getElementById('compare-content');
-  if (!ids.length) { el.innerHTML='<div class="empty-compare">暂无评分数据<br><span style="font-size:12px;margin-top:6px;display:block">评委进入页面开始打分后，对比数据将实时出现在这里</span></div>'; return; }
+  if (!ids.length) { el.innerHTML=`<div class="empty-compare">${t('emptyCompare')}<br><span style="font-size:12px;margin-top:6px;display:block">${t('emptyCompareHint')}</span></div>`; return; }
   const legend = ids.map((id,i) => { const name=allData[id]?.displayName||id; const ws=calcW(allData[id]?.ratings||{}); const v=verdict(ws); return `<div class="legend-item"><span class="legend-dot" style="background:${COLORS[i%COLORS.length]}"></span><span class="legend-name">${name}</span><span class="legend-score ${v.cls}">${ws??'—'}</span></div>`; }).join('');
   const headCols = ids.map((id,i)=>`<th style="color:${COLORS[i%COLORS.length]}">${allData[id]?.displayName||id}</th>`).join('');
-  const bodyRows = QS.map(q => { const scores=ids.map(id=>allData[id]?.ratings?.[q.id]); const valid=scores.filter(s=>s!==undefined); const avg=valid.length?(valid.reduce((a,b)=>a+b,0)/valid.length).toFixed(1):null; const scoreCols=scores.map(s=>`<td class="ct-score ${s===5?'hi':s===3?'mid':s===1?'lo':'none'}">${s??'—'}</td>`).join(''); return `<tr><td class="ct-qlabel">${q.title}</td><td class="ct-weight">${Math.round(q.w*100)}%</td>${scoreCols}<td class="ct-avg">${avg??'—'}</td></tr>`; }).join('');
+  const bodyRows = QS.map(q => { const scores=ids.map(id=>allData[id]?.ratings?.[q.id]); const valid=scores.filter(s=>s!==undefined); const avg=valid.length?(valid.reduce((a,b)=>a+b,0)/valid.length).toFixed(1):null; const scoreCols=scores.map(s=>`<td class="ct-score ${s===5?'hi':s===3?'mid':s===1?'lo':'none'}">${s??'—'}</td>`).join(''); return `<tr><td class="ct-qlabel">${qf(q,'title')}</td><td class="ct-weight">${Math.round(q.w*100)}%</td>${scoreCols}<td class="ct-avg">${avg??'—'}</td></tr>`; }).join('');
   const totalCols = ids.map(id=>{ const ws=calcW(allData[id]?.ratings||{}); const v=verdict(ws); return `<td class="ct-score ${v.cls||'none'}">${ws??'—'}</td>`; }).join('');
   const verdictCols = ids.map(id=>{ const ws=calcW(allData[id]?.ratings||{}); const v=verdict(ws); return `<td><span class="verdict-pill ${v.cls}">${v.lbl}</span></td>`; }).join('');
-  el.innerHTML=`<div class="compare-card"><div class="compare-legend">${legend}</div><div style="overflow-x:auto"><table class="compare-table"><thead><tr><th class="ct-qlabel">题目</th><th class="ct-weight">权重</th>${headCols}<th>平均</th></tr></thead><tbody>${bodyRows}</tbody><tfoot><tr><td colspan="2">加权总分</td>${totalCols}<td></td></tr><tr><td colspan="2">录用建议</td>${verdictCols}<td></td></tr></tfoot></table></div></div>`;
+  el.innerHTML=`<div class="compare-card"><div class="compare-legend">${legend}</div><div style="overflow-x:auto"><table class="compare-table"><thead><tr><th class="ct-qlabel">${t('thQuestion')}</th><th class="ct-weight">${t('thWeight')}</th>${headCols}<th>${t('thAvg')}</th></tr></thead><tbody>${bodyRows}</tbody><tfoot><tr><td colspan="2">${t('totalRow')}</td>${totalCols}<td></td></tr><tr><td colspan="2">${t('verdictRow')}</td>${verdictCols}<td></td></tr></tfoot></table></div></div>`;
 }
 
 function buildReportHTML(id) {
-  const candName = candidates.find(c=>c.id===activeCandidateId)?.name || '候选人';
+  const candName = candidates.find(c=>c.id===activeCandidateId)?.name || t('candidateFallback');
   const d = allData[id]; const ws = calcW(d.ratings||{}); const v = verdict(ws);
-  const dateStr = new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long',day:'numeric'});
+  const dateStr = new Date().toLocaleDateString(locale(),{year:'numeric',month:'long',day:'numeric'});
 
   function scLabel(sc) {
-    if (sc===undefined) return {txt:'未评',bg:'#f0f2f6',col:'#9aa1b0',bdr:'#e0e3ea'};
-    if (sc>=4) return {txt:sc+' 优秀',bg:'#ebfaf3',col:'#1a7a48',bdr:'#a3dcbc'};
-    if (sc>=2.5) return {txt:sc+' 达标',bg:'#fdf6e7',col:'#b7770d',bdr:'#f0d896'};
-    return {txt:sc+' 不足',bg:'#fdf1f0',col:'#c0392b',bdr:'#f4c0bb'};
+    if (sc===undefined) return {txt:t('scNone'),bg:'#f0f2f6',col:'#9aa1b0',bdr:'#e0e3ea'};
+    if (sc>=4) return {txt:sc+' '+t('scExcellent'),bg:'#ebfaf3',col:'#1a7a48',bdr:'#a3dcbc'};
+    if (sc>=2.5) return {txt:sc+' '+t('scMeets'),bg:'#fdf6e7',col:'#b7770d',bdr:'#f0d896'};
+    return {txt:sc+' '+t('scBelow'),bg:'#fdf1f0',col:'#c0392b',bdr:'#f4c0bb'};
   }
   function vStyle(vc) {
     if (vc==='hi') return {bg:'#ebfaf3',col:'#1a7a48',bdr:'#a3dcbc'};
@@ -1348,7 +1498,7 @@ function buildReportHTML(id) {
     const sc=d.ratings?.[q.id]; const sl=scLabel(sc);
     return `<div style="background:#f7f8fb;border-radius:8px;border:1px solid #f0f2f6;padding:.75rem 1rem;">
       <div style="font-family:monospace;font-size:9px;color:#9aa1b0;margin-bottom:3px;">Q${q.num} &nbsp;·&nbsp; ${Math.round(q.w*100)}%</div>
-      <div style="font-size:12px;color:#3d4350;margin-bottom:7px;line-height:1.35;">${q.title}</div>
+      <div style="font-size:12px;color:#3d4350;margin-bottom:7px;line-height:1.35;">${qf(q,'title')}</div>
       <span style="font-family:monospace;font-size:13px;font-weight:600;padding:3px 10px;border-radius:6px;background:${sl.bg};color:${sl.col};border:1px solid ${sl.bdr};">${sc??'—'}</span>
     </div>`;
   }).join('');
@@ -1357,27 +1507,27 @@ function buildReportHTML(id) {
   let lastMod=null, cardsHTML='';
   QS.forEach(q=>{
     if (q.mod!==lastMod) {
-      cardsHTML+=`<div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9aa1b0;margin:2rem 0 .75rem;display:flex;align-items:center;gap:10px;">${q.mod} &nbsp;·&nbsp; ${q.mw} <span style="flex:1;height:1px;background:#f0f2f6;display:inline-block;"></span></div>`;
+      cardsHTML+=`<div style="font-family:monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9aa1b0;margin:2rem 0 .75rem;display:flex;align-items:center;gap:10px;">${qf(q,'mod')} &nbsp;·&nbsp; ${q.mw} <span style="flex:1;height:1px;background:#f0f2f6;display:inline-block;"></span></div>`;
       lastMod=q.mod;
     }
     const sc=d.ratings?.[q.id]; const note=d.notes?.[q.id]||''; const sl=scLabel(sc);
     let rubHTML='';
     if (sc!==undefined) {
-      let rt,rb,rc,rbd;
-      if (sc===1){rt=`1分 — ${q.r1}`;rb='#fdf1f0';rc='#8b1a10';rbd='#f4c0bb';}
-      else if (sc===3){rt=`3分 — ${q.r3}`;rb='#fdf6e7';rc='#7a5200';rbd='#f0d896';}
-      else if (sc===5){rt=`5分 — ${q.r5}`;rb='#ebfaf3';rc='#0f5c34';rbd='#a3dcbc';}
-      else if (sc<3){rt=`${sc}分 — 介于「不足」(1) 与「达标」(3) 之间`;rb='#fdf6e7';rc='#7a5200';rbd='#f0d896';}
-      else {rt=`${sc}分 — 介于「达标」(3) 与「优秀」(5) 之间`;rb='#ebfaf3';rc='#0f5c34';rbd='#a3dcbc';}
+      let rt=rubricText(q,sc),rb,rc,rbd;
+      if (sc===1){rb='#fdf1f0';rc='#8b1a10';rbd='#f4c0bb';}
+      else if (sc===3){rb='#fdf6e7';rc='#7a5200';rbd='#f0d896';}
+      else if (sc===5){rb='#ebfaf3';rc='#0f5c34';rbd='#a3dcbc';}
+      else if (sc<3){rb='#fdf6e7';rc='#7a5200';rbd='#f0d896';}
+      else {rb='#ebfaf3';rc='#0f5c34';rbd='#a3dcbc';}
       rubHTML=`<div style="font-size:12px;line-height:1.65;padding:8px 12px;border-radius:7px;margin-top:10px;background:${rb};border:1px solid ${rbd};color:${rc};">${rt}</div>`;
     }
     const noteHTML=note?`<div style="margin-top:8px;font-size:12.5px;color:#3d4350;background:#f7f8fb;border:1px solid #e0e3ea;border-radius:7px;padding:9px 12px;white-space:pre-wrap;line-height:1.65;">${note.replace(/</g,'&lt;')}</div>`:'';
     cardsHTML+=`<div style="background:#fff;border:1px solid #e0e3ea;border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:10px;break-inside:avoid;page-break-inside:avoid;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
         <div style="flex:1;min-width:0;">
-          <div style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9aa1b0;margin-bottom:3px;">Q${q.num} &nbsp;·&nbsp; ${q.mod.split('·')[0].trim()}</div>
-          <div style="font-family:'Instrument Serif',Georgia,serif;font-size:16px;color:#111318;line-height:1.3;margin-bottom:5px;">${q.title}</div>
-          <div style="font-size:12px;color:#6b7384;line-height:1.7;">${q.full}</div>
+          <div style="font-family:monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#9aa1b0;margin-bottom:3px;">Q${q.num} &nbsp;·&nbsp; ${qf(q,'mod').split('·')[0].trim()}</div>
+          <div style="font-family:'Instrument Serif',Georgia,serif;font-size:16px;color:#111318;line-height:1.3;margin-bottom:5px;">${qf(q,'title')}</div>
+          <div style="font-size:12px;color:#6b7384;line-height:1.7;">${qf(q,'full')}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
           <span style="font-family:monospace;font-size:11px;background:#f0f2f6;color:#6b7384;padding:3px 10px;border-radius:20px;border:1px solid #e0e3ea;">${Math.round(q.w*100)}%</span>
@@ -1392,9 +1542,9 @@ function buildReportHTML(id) {
   const pct=Math.round(rcnt/TOTAL_Q*100);
 
   const html=`<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8">
+<html lang="${lang==='zh'?'zh-CN':'en'}"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>面试评分报告 · ${candName}</title>
+<title>${t('reportTitle')} · ${candName}</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1407,7 +1557,7 @@ body{font-family:'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif;back
 <body>
 <button class="print-fab no-print" onclick="window.print()">
   <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-  打印 / 存为 PDF
+  ${t('printBtn')}
 </button>
 <div class="wrap">
 
@@ -1415,26 +1565,26 @@ body{font-family:'IBM Plex Sans','PingFang SC','Microsoft YaHei',sans-serif;back
   <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:6px;">Amgreat North America · Operation-Finance</div>
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;">
     <div>
-      <div style="font-family:'Instrument Serif',Georgia,serif;font-size:26px;color:#fff;line-height:1.2;letter-spacing:-.01em;">Finance Manager<br><em style="color:rgba(255,255,255,.65);">面试评分报告</em></div>
-      <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:4px;">评分规则：5 优秀 · 3 达标 · 1 不足</div>
+      <div style="font-family:'Instrument Serif',Georgia,serif;font-size:26px;color:#fff;line-height:1.2;letter-spacing:-.01em;">Finance Manager<br><em style="color:rgba(255,255,255,.65);">${t('reportTitle')}</em></div>
+      <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:4px;">${t('ruleLine')}</div>
     </div>
     <span style="padding:7px 18px;border-radius:20px;font-size:13px;font-weight:500;background:${vs.bg};color:${vs.col};border:1px solid ${vs.bdr};align-self:flex-start;">${v.lbl}</span>
   </div>
   <div style="display:flex;gap:2.5rem;padding-top:1.25rem;border-top:1px solid rgba(255,255,255,.12);flex-wrap:wrap;">
-    ${[['候选人',candName],['面试官',d.displayName||id],['面试日期',dateStr],['加权总分',(ws??'未完成')+' / 5.00'],['完成进度',pct+'%  ('+rcnt+'/'+TOTAL_Q+' 题)']].map(([l,val])=>`<div><div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:3px;">${l}</div><div style="font-size:13px;color:rgba(255,255,255,.85);font-weight:500;">${val}</div></div>`).join('')}
+    ${[[t('metaCandidate'),candName],[t('interviewer'),d.displayName||id],[t('interviewDate'),dateStr],[t('totalRow'),(ws??t('incomplete'))+' / 5.00'],[t('completion'),pct+'%  ('+rcnt+'/'+TOTAL_Q+t('qSuffixCount')]].map(([l,val])=>`<div><div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:3px;">${l}</div><div style="font-size:13px;color:rgba(255,255,255,.85);font-weight:500;">${val}</div></div>`).join('')}
   </div>
 </div>
 
 <div style="background:#fff;border:1px solid #e0e3ea;border-radius:12px;padding:1.5rem 1.75rem;margin-bottom:1.75rem;">
-  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9aa1b0;margin-bottom:1rem;">各题得分总览</div>
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9aa1b0;margin-bottom:1rem;">${t('overviewTitle')}</div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px;">${gridHTML}</div>
 </div>
 
 ${cardsHTML}
 
 <div style="margin-top:2rem;padding-top:1rem;border-top:1px solid #e0e3ea;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9aa1b0;">
-  <span>Amgreat North America · Finance Manager 面试评分系统</span>
-  <span>导出时间：${new Date().toLocaleString('zh-CN')}</span>
+  <span>${t('footerSystem')}</span>
+  <span>${t('exportedAt')}${new Date().toLocaleString(locale())}</span>
 </div>
 
 </div></body></html>`;
@@ -1448,7 +1598,7 @@ function doExport() {
   const safe = candName.replace(/[^\w一-鿿]/g,'_');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
-  a.download = `面试评分报告_${safe}_${displayName}_${new Date().getFullYear()}.html`;
+  a.download = `${t('exportFilePrefix')}_${safe}_${displayName}_${new Date().getFullYear()}.html`;
   a.click();
 }
 
@@ -1461,7 +1611,7 @@ function doPrint() {
   const win = window.open(blobUrl, '_blank');
   if (!win) {
     URL.revokeObjectURL(blobUrl);
-    alert('浏览器阻止了弹出窗口。\n\n请点击地址栏右侧的弹出拦截提示，选择「允许」后重试。');
+    alert(t('popupBlocked'));
     return;
   }
   win.addEventListener('load', () => {
@@ -1474,27 +1624,28 @@ function doPrint() {
 }
 
 document.getElementById('yr').textContent = new Date().getFullYear();
+applyLang();
 window.addEventListener('firestore-ready', initApp);
 </script>
 
 <!-- Link entry modal for resume -->
 <div id="link-modal" style="display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;background:rgba(15,20,35,.6);backdrop-filter:blur(4px);" onclick="if(event.target===this)closeLinkModal()">
   <div style="background:#fff;border-radius:14px;padding:2rem;width:min(480px,94vw);box-shadow:0 32px 80px rgba(0,0,0,.3);">
-    <div style="font-family:'Instrument Serif',Georgia,serif;font-size:19px;color:var(--ink);margin-bottom:4px;">添加简历链接</div>
+    <div style="font-family:'Instrument Serif',Georgia,serif;font-size:19px;color:var(--ink);margin-bottom:4px;" data-i18n="linkModalTitle">添加简历链接</div>
     <div id="link-modal-cand-name" style="font-size:12px;color:var(--ink-mute);font-family:'IBM Plex Mono',monospace;margin-bottom:1.25rem;"></div>
     <input id="link-modal-input" type="url" placeholder="https://drive.google.com/file/d/…/view"
       style="width:100%;padding:10px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:13.5px;font-family:'IBM Plex Sans',sans-serif;color:var(--ink);background:var(--bg);outline:none;margin-bottom:10px;transition:border-color .15s;"
       onfocus="this.style.borderColor='var(--accent)';this.style.background='#fff'"
       onblur="this.style.borderColor='var(--line)';this.style.background='var(--bg)'"
       onkeydown="if(event.key==='Enter')confirmResumeLink();if(event.key==='Escape')closeLinkModal()">
-    <div style="background:var(--accent-soft);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--accent);line-height:1.7;margin-bottom:1.25rem;">
+    <div style="background:var(--accent-soft);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--accent);line-height:1.7;margin-bottom:1.25rem;" data-i18n-html="driveSteps">
       <strong>Google Drive 步骤：</strong><br>
       1. 右键 PDF → 共享 → 「知道链接的任何人可查看」<br>
       2. 复制链接，粘贴到上方即可
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button onclick="closeLinkModal()" style="padding:8px 18px;border:1.5px solid var(--line);border-radius:8px;background:none;color:var(--ink-soft);font-size:13px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;">取消</button>
-      <button onclick="confirmResumeLink()" style="padding:8px 22px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:13px;font-weight:500;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;">确认添加</button>
+      <button onclick="closeLinkModal()" style="padding:8px 18px;border:1.5px solid var(--line);border-radius:8px;background:none;color:var(--ink-soft);font-size:13px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;" data-i18n="cancel">取消</button>
+      <button onclick="confirmResumeLink()" style="padding:8px 22px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:13px;font-weight:500;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;" data-i18n="confirmAdd">确认添加</button>
     </div>
   </div>
 </div>
@@ -1503,17 +1654,17 @@ window.addEventListener('firestore-ready', initApp);
 <div id="resume-modal" class="resume-modal" style="display:none" onclick="if(event.target===this)closeResumeModal()">
   <div class="resume-modal-panel">
     <div class="resume-modal-header">
-      <span id="resume-modal-title" class="resume-modal-title">候选人简历</span>
+      <span id="resume-modal-title" class="resume-modal-title" data-i18n="resumeModalDefault">候选人简历</span>
       <div class="resume-modal-actions">
-        <button class="resume-modal-act-btn" onclick="changeResumeLink()" title="替换简历链接">
+        <button class="resume-modal-act-btn" onclick="changeResumeLink()">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 7h3a5 5 0 0 1 5 5 5 5 0 0 1-5 5h-3m-6 0H6a5 5 0 0 1-5-5 5 5 0 0 1 5-5h3"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-          更换链接
+          <span data-i18n="changeLink">更换链接</span>
         </button>
         <a id="resume-download-link" href="#" download class="resume-modal-act-btn" target="_blank">
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          在新窗口打开
+          <span data-i18n="openNew">在新窗口打开</span>
         </a>
-        <button class="resume-modal-act-btn" onclick="closeResumeModal()">✕ 关闭</button>
+        <button class="resume-modal-act-btn" onclick="closeResumeModal()" data-i18n="closeBtn">✕ 关闭</button>
       </div>
     </div>
     <div id="resume-progress-bar" class="resume-progress-bar"></div>
